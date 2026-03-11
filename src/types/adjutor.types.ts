@@ -28,11 +28,27 @@ export interface BVNData {
   middle_name: string
   last_name: string
   dob: string
+  formatted_dob?: string
   mobile: string
+  mobile2?: string | null
   email: string
   gender: string
+  marital_status?: string | null
+  nationality?: string | null
+  nin?: string | null
+  name_on_card?: string | null
+  lga_of_origin?: string | null
+  lga_of_residence?: string | null
+  state_of_origin?: string | null
   state_of_residence: string
-  image_url: string
+  residential_address?: string | null
+  registration_date?: string | null
+  enrollment_bank?: string | null
+  enrollment_branch?: string | null
+  level_of_account?: string | null
+  watchlisted?: number | null
+  image_url?: string | null
+  base64Image?: string | null
 }
 
 export type BVNResponse = AdjutorResponse<BVNData>

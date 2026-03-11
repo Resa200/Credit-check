@@ -11,8 +11,8 @@ export const bvnSchema = z.object({
     .refine(
       (v) =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ||
-        /^(\+234|0)[789]\d{9}$/.test(v),
-      'Enter a valid email address or Nigerian phone number (e.g. +2348012345678)'
+        /^(0)[789]\d{9}$/.test(v),
+      'Enter a valid email address or Nigerian phone number (e.g. 08012345678)'
     ),
 })
 

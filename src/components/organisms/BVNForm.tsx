@@ -33,7 +33,7 @@ export default function BVNForm({ onSubmit, loading }: BVNFormProps) {
         label="Email or Phone Number"
         fieldId="contact"
         required
-        placeholder="e.g. john@email.com or +2348012345678"
+        placeholder="e.g. john@email.com or 08012345678"
         tooltip="An OTP will be sent to the phone number or email registered to this BVN so it can be verified."
         error={errors.contact?.message}
         {...register('contact')}
