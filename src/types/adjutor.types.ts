@@ -64,7 +64,7 @@ export interface AccountData {
 
 export type AccountResponse = AdjutorResponse<AccountData>
 
-// ─── Credit Report ────────────────────────────────────────────────────────────
+// ─── Credit Report — Generic (FirstCentral / fallback) ────────────────────────
 
 export interface CreditSummary {
   total_facilities?: number
@@ -106,10 +106,68 @@ export interface CreditReportData {
   credit_summary?: CreditSummary
   loan_history?: LoanRecord[]
   enquiry_history?: EnquiryRecord[]
-  [key: string]: unknown // allows for bureau-specific variations
+  [key: string]: unknown
 }
 
 export type CreditReportResponse = AdjutorResponse<CreditReportData>
+
+// ─── Credit Report — CRC-specific raw types ───────────────────────────────────
+
+export interface CRCIdentification {
+  source_id: string
+  id_value: string
+  id_display_name: string
+  ruid?: string
+}
+
+export interface CRCConsumerDetails {
+  name?: string
+  first_name?: string
+  last_name?: string
+  date_of_birth?: string
+  gender?: string
+  citizenship?: string
+  ruid?: string
+  identification?: CRCIdentification[]
+}
+
+export interface CRCFacilitySummary {
+  no_of_delinqcreditfacilities?: string
+  has_creditfacilities?: string
+  last_reported_date?: string
+}
+
+export interface CRCReportData {
+  nano_consumer_profile?: { consumer_details?: CRCConsumerDetails }
+  consumer_relation?: string
+  credit_nano_summary?: { summary?: CRCFacilitySummary }
+  mfcredit_nano_summary?: { summary?: CRCFacilitySummary }
+  mgcredit_nano_summary?: { summary?: CRCFacilitySummary }
+  last_checked_date?: string
+}
+
+// ─── Normalized Credit Report (used by UI + PDF) ──────────────────────────────
+
+export interface NormalizedFacilitySection {
+  label: string
+  hasFacilities: boolean
+  delinquentCount: number
+  lastReportedDate?: string
+}
+
+export interface NormalizedCreditReport {
+  fullName?: string
+  dateOfBirth?: string
+  gender?: string
+  identifications?: { type: string; value: string }[]
+  creditScore?: number
+  maxScore?: number
+  facilitySections?: NormalizedFacilitySection[]
+  loans?: LoanRecord[]
+  enquiries?: EnquiryRecord[]
+  lastCheckedDate?: string
+  raw: CreditReportData
+}
 
 // ─── Bank List ────────────────────────────────────────────────────────────────
 

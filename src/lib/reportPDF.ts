@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf'
-import type { CreditReportData } from '@/types/adjutor.types'
+import type { NormalizedCreditReport } from '@/types/adjutor.types'
 import { formatNaira, formatDate, getCreditRating } from './utils'
 import type { RefObject } from 'react'
 
@@ -22,7 +22,7 @@ function ratingColor(rating: string): string {
 }
 
 export async function generateCreditPDF(
-  data: CreditReportData,
+  data: NormalizedCreditReport,
   bureau: string,
   _ref: RefObject<HTMLDivElement | null>
 ): Promise<void> {
@@ -69,7 +69,7 @@ export async function generateCreditPDF(
   y = 60
 
   // Name
-  const name = data.personal_info?.full_name || 'Report Holder'
+  const name = data.fullName || 'Report Holder'
   doc.setFontSize(22)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(TEXT)
@@ -81,8 +81,8 @@ export async function generateCreditPDF(
   y += 12
 
   // Score block
-  const score = data.credit_summary?.credit_score
-  const maxScore = data.credit_summary?.max_score || 850
+  const score = data.creditScore
+  const maxScore = data.maxScore || 850
   if (score !== undefined) {
     const rating = getCreditRating(score, maxScore)
     const color = ratingColor(rating)
@@ -135,20 +135,38 @@ export async function generateCreditPDF(
   }
 
   // ── Personal Info ────────────────────────────────────────────────────────────
-  const pi = data.personal_info
-  if (pi) {
+  if (data.fullName || data.dateOfBirth || data.gender) {
     sectionHeader('Personal Information')
-    if (pi.full_name) dataRow('Full Name', pi.full_name)
-    if (pi.date_of_birth) dataRow('Date of Birth', formatDate(pi.date_of_birth))
-    if (pi.gender) dataRow('Gender', pi.gender)
-    if (pi.phone) dataRow('Phone', pi.phone)
-    if (pi.address) dataRow('Address', pi.address)
-    if (pi.bvn) dataRow('BVN', `${pi.bvn.slice(0, 3)}*****${pi.bvn.slice(-3)}`)
+    if (data.fullName) dataRow('Full Name', data.fullName)
+    if (data.dateOfBirth) dataRow('Date of Birth', formatDate(data.dateOfBirth))
+    if (data.gender) dataRow('Gender', data.gender)
     y += 4
   }
 
-  // ── Loan Summary ─────────────────────────────────────────────────────────────
-  const cs = data.credit_summary
+  // ── Identifications (CRC) ────────────────────────────────────────────────────
+  if (data.identifications && data.identifications.length > 0) {
+    sectionHeader('Identifications')
+    data.identifications.forEach((id) => dataRow(id.type, id.value))
+    y += 4
+  }
+
+  // ── Facility Summaries (CRC) ─────────────────────────────────────────────────
+  if (data.facilitySections && data.facilitySections.length > 0) {
+    sectionHeader('Credit Facilities')
+    data.facilitySections.forEach((section) => {
+      dataRow(section.label, section.hasFacilities ? 'Has Facilities' : 'No Facilities')
+      if (section.hasFacilities) {
+        dataRow('Delinquent Facilities', String(section.delinquentCount))
+      }
+      if (section.lastReportedDate) {
+        dataRow('Last Reported', section.lastReportedDate)
+      }
+    })
+    y += 4
+  }
+
+  // ── Generic Loan Summary (FirstCentral) ───────────────────────────────────────
+  const cs = data.raw.credit_summary
   if (cs) {
     sectionHeader('Loan Summary')
     if (cs.total_facilities !== undefined) dataRow('Total Facilities', String(cs.total_facilities))
@@ -160,11 +178,10 @@ export async function generateCreditPDF(
   }
 
   // ── Loan History ─────────────────────────────────────────────────────────────
-  const loans = data.loan_history || []
+  const loans = data.loans || []
   if (loans.length > 0) {
     sectionHeader('Loan History')
 
-    // Table header
     const cols = { lender: margin, amount: margin + 55, outstanding: margin + 95, status: margin + 130, date: margin + 160 }
     doc.setFontSize(7.5)
     doc.setFont('helvetica', 'bold')
@@ -197,7 +214,7 @@ export async function generateCreditPDF(
   }
 
   // ── Enquiry History ───────────────────────────────────────────────────────────
-  const enquiries = data.enquiry_history || []
+  const enquiries = data.enquiries || []
   if (enquiries.length > 0) {
     sectionHeader('Enquiry History')
     enquiries.forEach((eq) => {

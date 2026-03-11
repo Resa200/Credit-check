@@ -1,14 +1,13 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { CreditReportData } from '@/types/adjutor.types'
-import { formatNaira, formatDate } from '@/lib/utils'
+import { normalizeCreditReport, formatDate, formatNaira } from '@/lib/utils'
 import { generateCreditPDF } from '@/lib/reportPDF'
 import DataRow from '@/components/molecules/DataRow'
 import LoanHistoryTable from '@/components/molecules/LoanHistoryTable'
 import CreditScoreGauge from '@/components/molecules/CreditScoreGauge'
 import StatusBadge from '@/components/molecules/StatusBadge'
 import Button from '@/components/atoms/Button'
-import { Download, ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { Download, ChevronDown, CheckCircle2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface CreditReportResultProps {
@@ -59,12 +58,7 @@ export default function CreditReportResult({
   const reportRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
 
-  const score = data.credit_summary?.credit_score
-  const maxScore = data.credit_summary?.max_score || 850
-  const personalInfo = data.personal_info
-  const summary = data.credit_summary
-  const loans = data.loan_history || []
-  const enquiries = data.enquiry_history || []
+  const report = normalizeCreditReport(data, bureau)
 
   const bureauLabel = bureau === 'crc' ? 'CRC Credit Bureau' : 'FirstCentral'
   const generatedDate = new Date().toLocaleDateString('en-NG', {
@@ -76,7 +70,7 @@ export default function CreditReportResult({
   async function handleDownload() {
     setDownloading(true)
     try {
-      await generateCreditPDF(data, bureau, reportRef)
+      await generateCreditPDF(report, bureau, reportRef)
     } finally {
       setDownloading(false)
     }
@@ -88,81 +82,142 @@ export default function CreditReportResult({
       <div className="flex flex-col items-center gap-2 text-center">
         <StatusBadge status="success" label="Report Retrieved" />
         <h2 className="text-xl font-bold text-[#1E293B]">
-          {personalInfo?.full_name || 'Credit Report'}
+          {report.fullName || 'Credit Report'}
         </h2>
         <p className="text-xs text-[#94A3B8]">
           {bureauLabel} · Generated {generatedDate}
         </p>
+        {report.lastCheckedDate && (
+          <p className="text-xs text-[#94A3B8]">
+            Last checked: {report.lastCheckedDate}
+          </p>
+        )}
       </div>
 
-      {/* Score */}
-      {score !== undefined && (
+      {/* Score gauge — only if present */}
+      {report.creditScore !== undefined && (
         <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 flex justify-center">
-          <CreditScoreGauge score={score} max={maxScore} />
+          <CreditScoreGauge
+            score={report.creditScore}
+            max={report.maxScore || 850}
+          />
         </div>
       )}
 
       {/* Printable report area */}
       <div ref={reportRef} className="flex flex-col gap-4">
         {/* Personal Info */}
-        {personalInfo && (
+        {(report.fullName || report.dateOfBirth || report.gender) && (
           <Section title="Personal Information">
-            {personalInfo.full_name && (
-              <DataRow label="Full Name" value={personalInfo.full_name} />
+            {report.fullName && (
+              <DataRow label="Full Name" value={report.fullName} />
             )}
-            {personalInfo.date_of_birth && (
-              <DataRow
-                label="Date of Birth"
-                value={formatDate(personalInfo.date_of_birth)}
-              />
+            {report.dateOfBirth && (
+              <DataRow label="Date of Birth" value={formatDate(report.dateOfBirth)} />
             )}
-            {personalInfo.gender && (
-              <DataRow label="Gender" value={personalInfo.gender} />
-            )}
-            {personalInfo.phone && (
-              <DataRow label="Phone" value={personalInfo.phone} />
-            )}
-            {personalInfo.address && (
-              <DataRow label="Address" value={personalInfo.address} />
+            {report.gender && (
+              <DataRow label="Gender" value={report.gender} />
             )}
           </Section>
         )}
 
-        {/* Loan Summary */}
-        {summary && (
+        {/* Identifications (CRC) */}
+        {report.identifications && report.identifications.length > 0 && (
+          <Section title="Identifications">
+            {report.identifications.map((id, i) => (
+              <DataRow key={i} label={id.type} value={id.value} />
+            ))}
+          </Section>
+        )}
+
+        {/* Facility Summaries (CRC) */}
+        {report.facilitySections && report.facilitySections.length > 0 && (
+          <Section title="Credit Facilities">
+            <div className="py-3 flex flex-col gap-3">
+              {report.facilitySections.map((section, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-[#E2E8F0] p-4 flex flex-col gap-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-[#1E293B]">
+                      {section.label}
+                    </span>
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
+                        section.hasFacilities
+                          ? 'bg-[#EDE9FE] text-[#7C3AED]'
+                          : 'bg-[#F1F5F9] text-[#64748B]'
+                      )}
+                    >
+                      {section.hasFacilities ? (
+                        <CheckCircle2 size={11} />
+                      ) : (
+                        <XCircle size={11} />
+                      )}
+                      {section.hasFacilities ? 'Has Facilities' : 'No Facilities'}
+                    </span>
+                  </div>
+                  {section.hasFacilities && (
+                    <p className="text-xs text-[#94A3B8]">
+                      Delinquent:{' '}
+                      <span className={cn(
+                        'font-semibold',
+                        section.delinquentCount > 0 ? 'text-[#F43F5E]' : 'text-[#059669]'
+                      )}>
+                        {section.delinquentCount}
+                      </span>
+                    </p>
+                  )}
+                  {section.lastReportedDate && (
+                    <p className="text-xs text-[#94A3B8]">
+                      Last reported: {section.lastReportedDate}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Generic Loan Summary (FirstCentral) */}
+        {data.credit_summary && (
           <Section title="Loan Summary">
-            {summary.total_facilities !== undefined && (
-              <DataRow label="Total Facilities" value={summary.total_facilities} />
+            {data.credit_summary.total_facilities !== undefined && (
+              <DataRow label="Total Facilities" value={data.credit_summary.total_facilities} />
             )}
-            {summary.active_loans !== undefined && (
-              <DataRow label="Active Loans" value={summary.active_loans} />
+            {data.credit_summary.active_loans !== undefined && (
+              <DataRow label="Active Loans" value={data.credit_summary.active_loans} />
             )}
-            {summary.settled_loans !== undefined && (
-              <DataRow label="Settled Loans" value={summary.settled_loans} />
+            {data.credit_summary.settled_loans !== undefined && (
+              <DataRow label="Settled Loans" value={data.credit_summary.settled_loans} />
             )}
-            {summary.past_due !== undefined && (
-              <DataRow label="Past Due" value={summary.past_due} />
+            {data.credit_summary.past_due !== undefined && (
+              <DataRow label="Past Due" value={data.credit_summary.past_due} />
             )}
-            {summary.total_outstanding !== undefined && (
+            {data.credit_summary.total_outstanding !== undefined && (
               <DataRow
                 label="Total Outstanding"
-                value={formatNaira(summary.total_outstanding)}
+                value={formatNaira(data.credit_summary.total_outstanding)}
               />
             )}
           </Section>
         )}
 
-        {/* Loan History */}
-        <Section title="Loan History">
-          <div className="py-3">
-            <LoanHistoryTable loans={loans} />
-          </div>
-        </Section>
+        {/* Loan History (FirstCentral) */}
+        {report.loans && report.loans.length > 0 && (
+          <Section title="Loan History">
+            <div className="py-3">
+              <LoanHistoryTable loans={report.loans} />
+            </div>
+          </Section>
+        )}
 
-        {/* Enquiry History */}
-        {enquiries.length > 0 && (
+        {/* Enquiry History (FirstCentral) */}
+        {report.enquiries && report.enquiries.length > 0 && (
           <Section title="Enquiry History">
-            {enquiries.map((eq, i) => (
+            {report.enquiries.map((eq, i) => (
               <DataRow
                 key={i}
                 label={formatDate(eq.enquiry_date || '')}
