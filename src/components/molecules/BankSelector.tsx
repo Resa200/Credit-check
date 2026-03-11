@@ -37,8 +37,8 @@ export default function BankSelector({
         setQuery('')
       }
     }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
+    document.addEventListener('click', handleOutside)
+    return () => document.removeEventListener('click', handleOutside)
   }, [])
 
   return (
@@ -79,7 +79,10 @@ export default function BankSelector({
 
         {open && (
           <div className="absolute z-50 mt-1 w-full rounded-lg border border-[#E2E8F0] bg-white shadow-lg overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-[#E2E8F0] px-3 py-2">
+            <div
+              className="flex items-center gap-2 border-b border-[#E2E8F0] px-3 py-2"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
               <Search size={14} className="text-[#94A3B8] flex-shrink-0" />
               <input
                 autoFocus
@@ -96,9 +99,10 @@ export default function BankSelector({
                 </li>
               ) : (
                 filtered.map((bank) => (
-                  <li key={bank.code}>
+                  <li key={bank.id}>
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       className={cn(
                         'w-full text-left px-4 py-2 text-sm hover:bg-[#EDE9FE] transition-colors',
                         bank.code === value

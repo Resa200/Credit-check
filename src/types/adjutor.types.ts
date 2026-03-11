@@ -99,7 +99,7 @@ export type CreditReportResponse = AdjutorResponse<CreditReportData>
 
 export interface Bank {
   id: number
-  code: string
+  code: string   // normalised — always populated by useBankList
   name: string
 }
 
