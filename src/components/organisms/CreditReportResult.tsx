@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { CreditReportData } from '@/types/adjutor.types'
-import { normalizeCreditReport, formatDate, formatNaira } from '@/lib/utils'
+import { normalizeCreditReport, formatDate } from '@/lib/utils'
 import { generateCreditPDF } from '@/lib/reportPDF'
 import DataRow from '@/components/molecules/DataRow'
 import LoanHistoryTable from '@/components/molecules/LoanHistoryTable'
@@ -106,26 +106,32 @@ export default function CreditReportResult({
 
       {/* Printable report area */}
       <div ref={reportRef} className="flex flex-col gap-4">
+
         {/* Personal Info */}
-        {(report.fullName || report.dateOfBirth || report.gender) && (
+        {(report.fullName || report.dateOfBirth || report.gender || report.phone || report.address) && (
           <Section title="Personal Information">
-            {report.fullName && (
-              <DataRow label="Full Name" value={report.fullName} />
-            )}
-            {report.dateOfBirth && (
-              <DataRow label="Date of Birth" value={formatDate(report.dateOfBirth)} />
-            )}
-            {report.gender && (
-              <DataRow label="Gender" value={report.gender} />
-            )}
+            {report.fullName && <DataRow label="Full Name" value={report.fullName} />}
+            {report.dateOfBirth && <DataRow label="Date of Birth" value={formatDate(report.dateOfBirth)} />}
+            {report.gender && <DataRow label="Gender" value={report.gender} />}
+            {report.phone && <DataRow label="Phone" value={report.phone} />}
+            {report.address && <DataRow label="Address" value={report.address} />}
           </Section>
         )}
 
-        {/* Identifications (CRC) */}
+        {/* Identifications */}
         {report.identifications && report.identifications.length > 0 && (
           <Section title="Identifications">
             {report.identifications.map((id, i) => (
               <DataRow key={i} label={id.type} value={id.value} />
+            ))}
+          </Section>
+        )}
+
+        {/* Credit Statistics (FirstCentral account counts + performance) */}
+        {report.creditStats && report.creditStats.length > 0 && (
+          <Section title="Credit Summary">
+            {report.creditStats.map((stat, i) => (
+              <DataRow key={i} label={stat.label} value={stat.value} />
             ))}
           </Section>
         )}
@@ -181,31 +187,7 @@ export default function CreditReportResult({
           </Section>
         )}
 
-        {/* Generic Loan Summary (FirstCentral) */}
-        {data.credit_summary && (
-          <Section title="Loan Summary">
-            {data.credit_summary.total_facilities !== undefined && (
-              <DataRow label="Total Facilities" value={data.credit_summary.total_facilities} />
-            )}
-            {data.credit_summary.active_loans !== undefined && (
-              <DataRow label="Active Loans" value={data.credit_summary.active_loans} />
-            )}
-            {data.credit_summary.settled_loans !== undefined && (
-              <DataRow label="Settled Loans" value={data.credit_summary.settled_loans} />
-            )}
-            {data.credit_summary.past_due !== undefined && (
-              <DataRow label="Past Due" value={data.credit_summary.past_due} />
-            )}
-            {data.credit_summary.total_outstanding !== undefined && (
-              <DataRow
-                label="Total Outstanding"
-                value={formatNaira(data.credit_summary.total_outstanding)}
-              />
-            )}
-          </Section>
-        )}
-
-        {/* Loan History (FirstCentral) */}
+        {/* Loan History */}
         {report.loans && report.loans.length > 0 && (
           <Section title="Loan History">
             <div className="py-3">
@@ -214,7 +196,7 @@ export default function CreditReportResult({
           </Section>
         )}
 
-        {/* Enquiry History (FirstCentral) */}
+        {/* Enquiry History */}
         {report.enquiries && report.enquiries.length > 0 && (
           <Section title="Enquiry History">
             {report.enquiries.map((eq, i) => (

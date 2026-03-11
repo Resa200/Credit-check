@@ -1,6 +1,12 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { CreditReportData, CRCReportData, NormalizedCreditReport } from '@/types/adjutor.types'
+import type {
+  CreditReportData,
+  CreditReportObject,
+  CRCReportData,
+  FirstCentralItem,
+  NormalizedCreditReport,
+} from '@/types/adjutor.types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -77,12 +83,55 @@ export function buildFullName(
   return [first, middle, last].filter(Boolean).join(' ')
 }
 
-/** Normalize a raw credit report response (CRC or generic) into a display-ready shape */
+/** Normalize a raw credit report response (CRC or FirstCentral) into a display-ready shape */
 export function normalizeCreditReport(
   data: CreditReportData,
-  bureau: string
+  _bureau: string
 ): NormalizedCreditReport {
-  // ── CRC structure ──────────────────────────────────────────────────────────
+  // ── FirstCentral: data is an array ─────────────────────────────────────────
+  if (Array.isArray(data)) {
+    const items = data as FirstCentralItem[]
+
+    const pd = items.find((i) => i.PersonalDetailsSummary)?.PersonalDetailsSummary?.[0]
+    const cs = items.find((i) => i.CreditSummary)?.CreditSummary?.[0]
+    const perf = items.find((i) => i.PerformanceClassification)?.PerformanceClassification?.[0]
+
+    const fullName = pd
+      ? [pd.Surname, pd.FirstName, pd.OtherNames].filter(Boolean).join(' ')
+      : undefined
+
+    const address = [pd?.ResidentialAddress1, pd?.ResidentialAddress2]
+      .filter(Boolean)
+      .join(', ') || undefined
+
+    const identifications: { type: string; value: string }[] = []
+    if (pd?.BankVerificationNo) identifications.push({ type: 'BVN', value: pd.BankVerificationNo })
+    if (pd?.NationalIDNo) identifications.push({ type: 'NIN', value: pd.NationalIDNo })
+    if (pd?.PassportNo) identifications.push({ type: 'Passport', value: pd.PassportNo })
+    if (pd?.DriversLicenseNo) identifications.push({ type: "Driver's License", value: pd.DriversLicenseNo })
+    if (pd?.PencomIDNo) identifications.push({ type: 'PenCom ID', value: pd.PencomIDNo })
+
+    const creditStats: { label: string; value: string }[] = []
+    if (cs?.TotalNumberOfAccountsReported) creditStats.push({ label: 'Total Accounts', value: cs.TotalNumberOfAccountsReported })
+    if (cs?.NumberOfAccountsInGoodStanding) creditStats.push({ label: 'Good Standing', value: cs.NumberOfAccountsInGoodStanding })
+    if (cs?.NumberOfAccountsInBadStanding) creditStats.push({ label: 'Bad Standing', value: cs.NumberOfAccountsInBadStanding })
+    if (perf?.NoOfLoansPerforming) creditStats.push({ label: 'Performing Loans', value: perf.NoOfLoansPerforming })
+    if (perf?.NoOfLoansSubstandard) creditStats.push({ label: 'Substandard', value: perf.NoOfLoansSubstandard })
+    if (perf?.NoOfLoansDoubtful) creditStats.push({ label: 'Doubtful', value: perf.NoOfLoansDoubtful })
+    if (perf?.NoOfLoansLost) creditStats.push({ label: 'Lost', value: perf.NoOfLoansLost })
+
+    return {
+      fullName,
+      dateOfBirth: pd?.BirthDate,
+      gender: pd?.Gender,
+      phone: pd?.CellularNo || pd?.HomeTelephoneNo || pd?.WorkTelephoneNo,
+      address,
+      identifications: identifications.length ? identifications : undefined,
+      creditStats: creditStats.length ? creditStats : undefined,
+    }
+  }
+
+  // ── CRC: object with nano_consumer_profile ─────────────────────────────────
   const crc = data as CRCReportData
   if (crc.nano_consumer_profile) {
     const cd = crc.nano_consumer_profile.consumer_details
@@ -131,20 +180,28 @@ export function normalizeCreditReport(
       identifications: identifications.length ? identifications : undefined,
       facilitySections: facilitySections.length ? facilitySections : undefined,
       lastCheckedDate: crc.last_checked_date,
-      raw: data,
     }
   }
 
-  // ── Generic / FirstCentral fallback ───────────────────────────────────────
-  void bureau // reserved for future bureau-specific handling
+  // ── Generic object fallback ────────────────────────────────────────────────
+  const obj = data as CreditReportObject
+  const cs2 = obj.credit_summary
+
+  const creditStats: { label: string; value: string }[] = []
+  if (cs2?.total_facilities !== undefined) creditStats.push({ label: 'Total Facilities', value: String(cs2.total_facilities) })
+  if (cs2?.active_loans !== undefined) creditStats.push({ label: 'Active Loans', value: String(cs2.active_loans) })
+  if (cs2?.settled_loans !== undefined) creditStats.push({ label: 'Settled Loans', value: String(cs2.settled_loans) })
+  if (cs2?.past_due !== undefined) creditStats.push({ label: 'Past Due', value: String(cs2.past_due) })
+  if (cs2?.total_outstanding !== undefined) creditStats.push({ label: 'Total Outstanding', value: formatNaira(cs2.total_outstanding) })
+
   return {
-    fullName: data.personal_info?.full_name,
-    dateOfBirth: data.personal_info?.date_of_birth,
-    gender: data.personal_info?.gender,
-    creditScore: data.credit_summary?.credit_score,
-    maxScore: data.credit_summary?.max_score,
-    loans: data.loan_history,
-    enquiries: data.enquiry_history,
-    raw: data,
+    fullName: obj.personal_info?.full_name,
+    dateOfBirth: obj.personal_info?.date_of_birth,
+    gender: obj.personal_info?.gender,
+    creditScore: cs2?.credit_score,
+    maxScore: cs2?.max_score,
+    creditStats: creditStats.length ? creditStats : undefined,
+    loans: obj.loan_history,
+    enquiries: obj.enquiry_history,
   }
 }

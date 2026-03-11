@@ -64,7 +64,7 @@ export interface AccountData {
 
 export type AccountResponse = AdjutorResponse<AccountData>
 
-// ─── Credit Report — Generic (FirstCentral / fallback) ────────────────────────
+// ─── Credit Report — Generic object shape (CRC / fallback) ───────────────────
 
 export interface CreditSummary {
   total_facilities?: number
@@ -101,13 +101,76 @@ export interface PersonalInfo {
   bvn?: string
 }
 
-export interface CreditReportData {
+// Generic object-shaped response (CRC, fallback)
+export interface CreditReportObject {
   personal_info?: PersonalInfo
   credit_summary?: CreditSummary
   loan_history?: LoanRecord[]
   enquiry_history?: EnquiryRecord[]
   [key: string]: unknown
 }
+
+// ─── Credit Report — FirstCentral array shape ─────────────────────────────────
+
+export interface FCPersonalDetails {
+  Surname?: string
+  FirstName?: string
+  OtherNames?: string
+  BirthDate?: string
+  Gender?: string
+  Nationality?: string
+  NationalIDNo?: string
+  PassportNo?: string
+  DriversLicenseNo?: string
+  BankVerificationNo?: string
+  PencomIDNo?: string
+  CellularNo?: string
+  HomeTelephoneNo?: string
+  WorkTelephoneNo?: string
+  EmailAddress?: string
+  ResidentialAddress1?: string
+  ResidentialAddress2?: string
+  MaritalStatus?: string | null
+  ConsumerID?: number
+  Header?: string
+}
+
+export interface FCCreditSummary {
+  TotalNumberOfAccountsReported?: string
+  NumberOfAccountsInGoodStanding?: string
+  NumberOfAccountsInBadStanding?: string
+}
+
+export interface FCPerformanceClassification {
+  NoOfLoansPerforming?: string
+  NoOfLoansSubstandard?: string
+  NoOfLoansDoubtful?: string
+  NoOfLoansLost?: string
+}
+
+export interface FCSubject {
+  ConsumerID?: number
+  SearchOutput?: string
+  Reference?: number
+}
+
+export interface FCEnquiryDetail {
+  SubscriberEnquiryResultID?: unknown
+  ProductID?: unknown
+  MatchingRate?: unknown
+}
+
+export interface FirstCentralItem {
+  SubjectList?: FCSubject[]
+  PersonalDetailsSummary?: FCPersonalDetails[]
+  CreditSummary?: FCCreditSummary[]
+  PerformanceClassification?: FCPerformanceClassification[]
+  EnquiryDetails?: FCEnquiryDetail[]
+  [key: string]: unknown
+}
+
+// Union: CRC returns an object, FirstCentral returns an array
+export type CreditReportData = CreditReportObject | FirstCentralItem[]
 
 export type CreditReportResponse = AdjutorResponse<CreditReportData>
 
@@ -159,14 +222,16 @@ export interface NormalizedCreditReport {
   fullName?: string
   dateOfBirth?: string
   gender?: string
+  phone?: string
+  address?: string
   identifications?: { type: string; value: string }[]
   creditScore?: number
   maxScore?: number
+  creditStats?: { label: string; value: string }[]
   facilitySections?: NormalizedFacilitySection[]
   loans?: LoanRecord[]
   enquiries?: EnquiryRecord[]
   lastCheckedDate?: string
-  raw: CreditReportData
 }
 
 // ─── Bank List ────────────────────────────────────────────────────────────────

@@ -135,18 +135,27 @@ export async function generateCreditPDF(
   }
 
   // ── Personal Info ────────────────────────────────────────────────────────────
-  if (data.fullName || data.dateOfBirth || data.gender) {
+  if (data.fullName || data.dateOfBirth || data.gender || data.phone || data.address) {
     sectionHeader('Personal Information')
     if (data.fullName) dataRow('Full Name', data.fullName)
     if (data.dateOfBirth) dataRow('Date of Birth', formatDate(data.dateOfBirth))
     if (data.gender) dataRow('Gender', data.gender)
+    if (data.phone) dataRow('Phone', data.phone)
+    if (data.address) dataRow('Address', data.address)
     y += 4
   }
 
-  // ── Identifications (CRC) ────────────────────────────────────────────────────
+  // ── Identifications ──────────────────────────────────────────────────────────
   if (data.identifications && data.identifications.length > 0) {
     sectionHeader('Identifications')
     data.identifications.forEach((id) => dataRow(id.type, id.value))
+    y += 4
+  }
+
+  // ── Credit Statistics (FirstCentral counts / generic summary) ─────────────────
+  if (data.creditStats && data.creditStats.length > 0) {
+    sectionHeader('Credit Summary')
+    data.creditStats.forEach((stat) => dataRow(stat.label, stat.value))
     y += 4
   }
 
@@ -162,18 +171,6 @@ export async function generateCreditPDF(
         dataRow('Last Reported', section.lastReportedDate)
       }
     })
-    y += 4
-  }
-
-  // ── Generic Loan Summary (FirstCentral) ───────────────────────────────────────
-  const cs = data.raw.credit_summary
-  if (cs) {
-    sectionHeader('Loan Summary')
-    if (cs.total_facilities !== undefined) dataRow('Total Facilities', String(cs.total_facilities))
-    if (cs.active_loans !== undefined) dataRow('Active Loans', String(cs.active_loans))
-    if (cs.settled_loans !== undefined) dataRow('Settled Loans', String(cs.settled_loans))
-    if (cs.past_due !== undefined) dataRow('Past Due', String(cs.past_due))
-    if (cs.total_outstanding !== undefined) dataRow('Total Outstanding', formatNaira(cs.total_outstanding))
     y += 4
   }
 
