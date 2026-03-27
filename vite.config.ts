@@ -17,6 +17,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
+          three: ['three', '@react-three/fiber', '@react-three/drei'],
+          motion: ['framer-motion'],
           pdf: ['jspdf', 'html2canvas'],
           supabase: ['@supabase/supabase-js'],
         },

@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
-import AppShell from '@/components/templates/AppShell'
 import AuthGuard from '@/components/molecules/AuthGuard'
 import { useAuthInit } from '@/hooks/useAuth'
 import Landing from '@/pages/Landing'
@@ -14,14 +13,6 @@ import Profile from '@/pages/Profile'
 import AuthCallback from '@/pages/AuthCallback'
 import ShareView from '@/pages/ShareView'
 import CommandBar from '@/components/organisms/CommandBar'
-
-function LandingWithShell() {
-  return (
-    <AppShell>
-      <Landing />
-    </AppShell>
-  )
-}
 
 export default function App() {
   useAuthInit()
@@ -40,7 +31,7 @@ export default function App() {
       />
       <CommandBar />
       <Routes>
-        <Route path="/" element={<LandingWithShell />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/services" element={<Services />} />
         <Route path="/verify" element={<Verify />} />
         <Route path="/login" element={<Login />} />

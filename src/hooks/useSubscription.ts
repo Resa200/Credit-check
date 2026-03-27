@@ -207,9 +207,8 @@ export function useSubscription() {
 
       toast.success('Subscription cancelled. You will retain access until the end of your billing period.')
       await refreshSubscription()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to cancel subscription'
-      toast.error(message)
+    } catch {
+      toast.error('Unable to cancel subscription. Please try again or contact support.')
     }
   }, [subscription, refreshSubscription])
 

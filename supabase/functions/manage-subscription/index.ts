@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
         )
       }
 
-      // Fetch the email token from Paystack
+      // Fetch subscription details from Paystack
       const fetchRes = await fetch(
         `https://api.paystack.co/subscription/${subscription_code}`,
         {
@@ -91,33 +91,49 @@ Deno.serve(async (req) => {
       )
       const fetchData = await fetchRes.json()
 
-      if (!fetchRes.ok || !fetchData.data?.email_token) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch subscription details from Paystack' }),
-          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+      // Check if subscription is already inactive/cancelled on Paystack
+      const paystackStatus = fetchData.data?.status
+      const alreadyCancelled =
+        paystackStatus === 'cancelled' ||
+        paystackStatus === 'non-renewing' ||
+        paystackStatus === 'complete' ||
+        paystackStatus === 'attention'
 
-      // Disable subscription on Paystack
-      const disableRes = await fetch('https://api.paystack.co/subscription/disable', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${paystackSecret}`,
-        },
-        body: JSON.stringify({
-          code: subscription_code,
-          token: fetchData.data.email_token,
-        }),
-      })
+      if (!alreadyCancelled) {
+        // Only try to disable if it's still active on Paystack
+        if (!fetchRes.ok || !fetchData.data?.email_token) {
+          return new Response(
+            JSON.stringify({ error: 'Failed to fetch subscription details from Paystack' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
 
-      const disableData = await disableRes.json()
+        const disableRes = await fetch('https://api.paystack.co/subscription/disable', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${paystackSecret}`,
+          },
+          body: JSON.stringify({
+            code: subscription_code,
+            token: fetchData.data.email_token,
+          }),
+        })
 
-      if (!disableRes.ok) {
-        return new Response(
-          JSON.stringify({ error: disableData.message || 'Failed to cancel subscription' }),
-          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        const disableData = await disableRes.json()
+
+        // If Paystack says it's already inactive, that's fine — just sync our DB
+        const alreadyInactive =
+          !disableRes.ok &&
+          typeof disableData.message === 'string' &&
+          disableData.message.toLowerCase().includes('already inactive')
+
+        if (!disableRes.ok && !alreadyInactive) {
+          return new Response(
+            JSON.stringify({ error: disableData.message || 'Failed to cancel subscription' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
       }
 
       // Update local DB (webhook will also do this, but update immediately for UX)
