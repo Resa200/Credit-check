@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Send, X, AlertCircle, RotateCcw } from 'lucide-react'
-import Button from '@/components/atoms/Button'
 import { useAIExplain } from '@/hooks/useAIExplain'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'

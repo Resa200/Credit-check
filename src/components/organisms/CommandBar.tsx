@@ -1,7 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { Command, Search, ArrowRight, Sparkles, AlertCircle, Navigation, Play, Filter, MessageSquare, X } from 'lucide-react'
 import { useCommandBar, SUGGESTIONS } from '@/hooks/useCommandBar'
-import { cn } from '@/lib/utils'
 import type { CommandIntent } from '@/types/commandBar.types'
 
 function IntentIcon({ type }: { type: CommandIntent['type'] }) {

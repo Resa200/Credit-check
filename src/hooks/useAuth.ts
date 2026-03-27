@@ -11,8 +11,32 @@ async function fetchProfile(authId: string): Promise<UserRow | null> {
     .select('*')
     .eq('auth_id', authId)
     .eq('deleted_flag', false)
-    .single()
-  return data
+    .maybeSingle()
+
+  if (data) return data
+
+  // Profile doesn't exist yet (OAuth user or trigger race condition)
+  // Create it from the auth user metadata
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const meta = user.user_metadata ?? {}
+  const fullName = meta.full_name ?? meta.name ?? ''
+  const email = user.email ?? ''
+
+  const { data: newProfile } = await supabase
+    .from('users')
+    .insert({
+      auth_id: user.id,
+      email,
+      full_name: fullName,
+      phone: null,
+      avatar_url: meta.avatar_url ?? meta.picture ?? null,
+    })
+    .select()
+    .maybeSingle()
+
+  return newProfile
 }
 
 async function syncPendingResult(profile: UserRow, pending: {
