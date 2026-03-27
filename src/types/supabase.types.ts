@@ -44,6 +44,47 @@ export interface AuditLogRow extends CommonColumns {
   ip_address: string | null
 }
 
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+
+export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due' | 'expired' | 'none'
+
+export interface SubscriptionRow extends CommonColumns {
+  user_id: string
+  paystack_customer_code: string | null
+  paystack_subscription_code: string | null
+  paystack_plan_code: string | null
+  status: SubscriptionStatus
+  current_period_start: string | null
+  current_period_end: string | null
+  cancelled_at: string | null
+}
+
+// ─── Payment Cards ───────────────────────────────────────────────────────────
+
+export interface PaymentCardRow extends CommonColumns {
+  user_id: string
+  paystack_authorization_code: string
+  card_bin: string | null
+  card_last4: string | null
+  card_exp_month: string | null
+  card_exp_year: string | null
+  card_type: string | null
+  bank: string | null
+  is_default: boolean
+}
+
+// ─── Payment Transactions ────────────────────────────────────────────────────
+
+export interface PaymentTransactionRow extends CommonColumns {
+  user_id: string
+  subscription_id: string | null
+  paystack_reference: string | null
+  amount: number
+  currency: string
+  status: 'success' | 'failed' | 'abandoned' | 'reversed'
+  payment_type: 'subscription' | 'one_time'
+}
+
 // ─── Database type map (for Supabase client generics) ────────────────────────
 
 export interface Database {
@@ -150,6 +191,132 @@ export interface Database {
           resource_id?: string | null
           details?: Record<string, unknown> | null
           ip_address?: string | null
+          meta?: Record<string, unknown> | null
+          created_on?: string
+          created_by?: string | null
+          modified_on?: string
+          modified_by?: string | null
+          deleted_on?: string | null
+          deleted_by?: string | null
+          deleted_flag?: boolean
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: SubscriptionRow
+        Insert: {
+          id?: string
+          user_id: string
+          paystack_customer_code?: string | null
+          paystack_subscription_code?: string | null
+          paystack_plan_code?: string | null
+          status?: SubscriptionStatus
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancelled_at?: string | null
+          meta?: Record<string, unknown> | null
+          created_on?: string
+          created_by?: string | null
+          modified_on?: string
+          modified_by?: string | null
+          deleted_on?: string | null
+          deleted_by?: string | null
+          deleted_flag?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          paystack_customer_code?: string | null
+          paystack_subscription_code?: string | null
+          paystack_plan_code?: string | null
+          status?: SubscriptionStatus
+          current_period_start?: string | null
+          current_period_end?: string | null
+          cancelled_at?: string | null
+          meta?: Record<string, unknown> | null
+          created_on?: string
+          created_by?: string | null
+          modified_on?: string
+          modified_by?: string | null
+          deleted_on?: string | null
+          deleted_by?: string | null
+          deleted_flag?: boolean
+        }
+        Relationships: []
+      }
+      payment_cards: {
+        Row: PaymentCardRow
+        Insert: {
+          id?: string
+          user_id: string
+          paystack_authorization_code: string
+          card_bin?: string | null
+          card_last4?: string | null
+          card_exp_month?: string | null
+          card_exp_year?: string | null
+          card_type?: string | null
+          bank?: string | null
+          is_default?: boolean
+          meta?: Record<string, unknown> | null
+          created_on?: string
+          created_by?: string | null
+          modified_on?: string
+          modified_by?: string | null
+          deleted_on?: string | null
+          deleted_by?: string | null
+          deleted_flag?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          paystack_authorization_code?: string
+          card_bin?: string | null
+          card_last4?: string | null
+          card_exp_month?: string | null
+          card_exp_year?: string | null
+          card_type?: string | null
+          bank?: string | null
+          is_default?: boolean
+          meta?: Record<string, unknown> | null
+          created_on?: string
+          created_by?: string | null
+          modified_on?: string
+          modified_by?: string | null
+          deleted_on?: string | null
+          deleted_by?: string | null
+          deleted_flag?: boolean
+        }
+        Relationships: []
+      }
+      payment_transactions: {
+        Row: PaymentTransactionRow
+        Insert: {
+          id?: string
+          user_id: string
+          subscription_id?: string | null
+          paystack_reference?: string | null
+          amount: number
+          currency?: string
+          status: 'success' | 'failed' | 'abandoned' | 'reversed'
+          payment_type?: 'subscription' | 'one_time'
+          meta?: Record<string, unknown> | null
+          created_on?: string
+          created_by?: string | null
+          modified_on?: string
+          modified_by?: string | null
+          deleted_on?: string | null
+          deleted_by?: string | null
+          deleted_flag?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          subscription_id?: string | null
+          paystack_reference?: string | null
+          amount?: number
+          currency?: string
+          status?: 'success' | 'failed' | 'abandoned' | 'reversed'
+          payment_type?: 'subscription' | 'one_time'
           meta?: Record<string, unknown> | null
           created_on?: string
           created_by?: string | null

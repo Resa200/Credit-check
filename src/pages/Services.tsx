@@ -3,21 +3,29 @@ import { Info, Lock } from 'lucide-react'
 import AppShell from '@/components/templates/AppShell'
 import ServiceGrid from '@/components/organisms/ServiceGrid'
 import Button from '@/components/atoms/Button'
+import QuotaBanner from '@/components/molecules/QuotaBanner'
+import UpgradePrompt from '@/components/molecules/UpgradePrompt'
 import { useAppStore } from '@/store/appStore'
 import { useAuth } from '@/hooks/useAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 import type { ServiceType } from '@/types/adjutor.types'
 
 export default function Services() {
   const { selectService, guestLookupUsed } = useAppStore()
   const { isAuthenticated } = useAuth()
+  const { monthlyLookupCount, freeLimit, isActive, hasQuota } = useSubscription()
   const navigate = useNavigate()
 
   const guestBlocked = !isAuthenticated && guestLookupUsed
+  const quotaExhausted = isAuthenticated && !hasQuota
 
   function handleSelect(service: ServiceType) {
     if (guestBlocked) {
       navigate('/login')
       return
+    }
+    if (quotaExhausted) {
+      return // blocked by UpgradePrompt below
     }
     selectService(service)
     navigate('/verify')
@@ -36,6 +44,15 @@ export default function Services() {
           </p>
         </div>
 
+        {/* Quota banner for authenticated users */}
+        {isAuthenticated && (
+          <QuotaBanner
+            used={monthlyLookupCount}
+            limit={freeLimit}
+            hasSubscription={isActive}
+          />
+        )}
+
         {/* Guest blocked banner */}
         {guestBlocked && (
           <div className="rounded-xl border border-[#7C3AED]/20 bg-[#EDE9FE]/30 p-6 mb-8 flex flex-col items-center gap-4 text-center">
@@ -47,7 +64,7 @@ export default function Services() {
                 Sign in to continue
               </h3>
               <p className="text-sm text-[#64748B]">
-                You've used your free lookup. Create an account or sign in to perform unlimited verifications and save your history.
+                You've used your free lookup. Create an account or sign in to perform verifications and save your history.
               </p>
             </div>
             <div className="flex gap-3">
@@ -60,6 +77,9 @@ export default function Services() {
             </div>
           </div>
         )}
+
+        {/* Quota exhausted — upgrade prompt */}
+        {quotaExhausted && <UpgradePrompt />}
 
         <ServiceGrid onSelect={handleSelect} />
       </div>

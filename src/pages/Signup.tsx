@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -22,10 +22,9 @@ export default function Signup() {
     resolver: zodResolver(signupSchema),
   })
 
-  if (isAuthenticated) {
-    navigate('/services', { replace: true })
-    return null
-  }
+  useEffect(() => {
+    if (isAuthenticated) navigate('/services', { replace: true })
+  }, [isAuthenticated, navigate])
 
   async function onSubmit(data: SignupFormValues) {
     setLoading(true)

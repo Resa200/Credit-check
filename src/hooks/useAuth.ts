@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { createAuditLog } from '@/lib/audit'
+import { fetchSubscription, fetchMonthlyLookupCount } from '@/hooks/useSubscription'
 import type { UserRow } from '@/types/supabase.types'
 
 async function fetchProfile(authId: string): Promise<UserRow | null> {
@@ -46,51 +47,104 @@ async function syncPendingResult(profile: UserRow, pending: {
   }
 }
 
-export function useAuth() {
-  const {
-    session, user, profile, loading,
-    setSession, setUser, setProfile, setLoading,
-    setPendingResult, clear,
-  } = useAuthStore()
+/** Load profile + subscription data into the store */
+async function loadUserData(
+  authId: string,
+  store: ReturnType<typeof useAuthStore.getState>
+) {
+  try {
+    const p = await fetchProfile(authId)
+    store.setProfile(p)
+    if (p) {
+      Promise.all([
+        fetchSubscription(p.id),
+        fetchMonthlyLookupCount(p.id),
+      ])
+        .then(([sub, count]) => {
+          store.setSubscription(sub)
+          store.setMonthlyLookupCount(count)
+        })
+        .catch(() => {})
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id).then(setProfile)
+      const pending = store.pendingResult
+      if (pending) {
+        syncPendingResult(p, pending)
+          .then(() => store.setPendingResult(null))
+          .catch(() => store.setPendingResult(null))
       }
-      setLoading(false)
+    }
+  } catch {
+    store.setProfile(null)
+  }
+}
+
+/**
+ * Call this ONCE in App.tsx to bootstrap the auth session.
+ */
+export function useAuthInit() {
+  useEffect(() => {
+    let mounted = true
+    const store = useAuthStore.getState()
+
+    // 1. Bootstrap from stored session (localStorage)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return
+      store.setSession(session)
+      store.setUser(session?.user ?? null)
+
+      if (session?.user) {
+        await loadUserData(session.user.id, store)
+      }
+
+      if (mounted) store.setLoading(false)
+    }).catch(() => {
+      if (mounted) store.setLoading(false)
     })
 
+    // 2. Listen for subsequent auth changes (sign-in, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          const p = await fetchProfile(session.user.id)
-          setProfile(p)
+      (event, session) => {
+        // Skip INITIAL_SESSION — already handled by getSession above
+        if (event === 'INITIAL_SESSION') return
+        if (!mounted) return
 
-          // Sync pending result after login/signup
-          const pending = useAuthStore.getState().pendingResult
-          if (p && pending) {
-            await syncPendingResult(p, pending)
-            setPendingResult(null)
-          }
+        store.setSession(session)
+        store.setUser(session?.user ?? null)
+
+        if (session?.user) {
+          loadUserData(session.user.id, store)
         } else {
-          setProfile(null)
+          store.setProfile(null)
+          store.setSubscription(null)
+          store.setMonthlyLookupCount(null as unknown as number)
         }
       }
     )
 
-    return () => subscription.unsubscribe()
-  }, [setSession, setUser, setProfile, setLoading, setPendingResult])
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+}
+
+/**
+ * Read auth state and get auth actions. Safe to call from any component.
+ */
+export function useAuth() {
+  const {
+    session, user, profile, loading,
+    setPendingResult, clear,
+  } = useAuthStore()
 
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     })
     if (error) throw error
     return data
@@ -104,15 +158,18 @@ export function useAuth() {
     if (error) throw error
 
     if (data.user) {
-      const p = await fetchProfile(data.user.id)
-      if (p) {
-        await createAuditLog({
-          userId: p.id,
-          action: 'login',
-          resourceType: 'users',
-          resourceId: p.id,
+      fetchProfile(data.user.id)
+        .then((p) => {
+          if (p) {
+            createAuditLog({
+              userId: p.id,
+              action: 'login',
+              resourceType: 'users',
+              resourceId: p.id,
+            }).catch(() => {})
+          }
         })
-      }
+        .catch(() => {})
     }
 
     return data
@@ -120,12 +177,12 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     if (profile) {
-      await createAuditLog({
+      createAuditLog({
         userId: profile.id,
         action: 'logout',
         resourceType: 'users',
         resourceId: profile.id,
-      })
+      }).catch(() => {})
     }
     await supabase.auth.signOut()
     clear()
@@ -133,7 +190,7 @@ export function useAuth() {
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
     })
     if (error) throw error
   }, [])

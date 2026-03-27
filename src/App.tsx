@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import AppShell from '@/components/templates/AppShell'
 import AuthGuard from '@/components/molecules/AuthGuard'
+import { useAuthInit } from '@/hooks/useAuth'
 import Landing from '@/pages/Landing'
 import Services from '@/pages/Services'
 import Verify from '@/pages/Verify'
@@ -10,6 +11,7 @@ import Signup from '@/pages/Signup'
 import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
 import Profile from '@/pages/Profile'
+import AuthCallback from '@/pages/AuthCallback'
 
 function LandingWithShell() {
   return (
@@ -20,6 +22,8 @@ function LandingWithShell() {
 }
 
 export default function App() {
+  useAuthInit()
+
   return (
     <BrowserRouter>
       <Toaster
@@ -39,6 +43,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="/profile"

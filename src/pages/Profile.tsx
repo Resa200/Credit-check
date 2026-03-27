@@ -1,28 +1,39 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { User, History, FileText, Trash2, AlertTriangle } from 'lucide-react'
+import { User, History, FileText, CreditCard, Trash2, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import AppShell from '@/components/templates/AppShell'
 import ProfileForm from '@/components/organisms/ProfileForm'
 import LookupHistoryTable from '@/components/organisms/LookupHistoryTable'
 import AuditLogTable from '@/components/organisms/AuditLogTable'
+import SubscriptionPanel from '@/components/organisms/SubscriptionPanel'
 import Button from '@/components/atoms/Button'
 import { cn } from '@/lib/utils'
 
-type Tab = 'profile' | 'history' | 'audit'
+type Tab = 'profile' | 'history' | 'audit' | 'subscription'
 
 const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: 'profile', label: 'Profile', icon: <User size={16} /> },
+  { key: 'subscription', label: 'Subscription', icon: <CreditCard size={16} /> },
   { key: 'history', label: 'Lookup History', icon: <History size={16} /> },
   { key: 'audit', label: 'Audit Log', icon: <FileText size={16} /> },
 ]
 
 export default function Profile() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { deleteAccount, profile } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('profile')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Support ?tab=subscription URL param (from QuotaBanner link)
+  useEffect(() => {
+    const tab = searchParams.get('tab') as Tab | null
+    if (tab && tabs.some((t) => t.key === tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
   const [deleting, setDeleting] = useState(false)
 
   async function handleDeleteAccount() {
@@ -145,6 +156,7 @@ export default function Profile() {
         )}
 
         {activeTab === 'history' && <LookupHistoryTable />}
+        {activeTab === 'subscription' && <SubscriptionPanel />}
         {activeTab === 'audit' && <AuditLogTable />}
       </div>
     </AppShell>

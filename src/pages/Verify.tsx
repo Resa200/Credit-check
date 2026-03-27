@@ -1,15 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store/appStore'
 import { useAuth } from '@/hooks/useAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 import { adjutorApi } from '@/hooks/useAdjutor'
 import { supabase } from '@/lib/supabase'
 import { createAuditLog } from '@/lib/audit'
+import { useAuthStore } from '@/store/authStore'
 import AppShell from '@/components/templates/AppShell'
 import ServiceLayout from '@/components/templates/ServiceLayout'
 import Spinner from '@/components/atoms/Spinner'
 import SaveResultPrompt from '@/components/molecules/SaveResultPrompt'
+import UpgradePrompt from '@/components/molecules/UpgradePrompt'
 
 // Forms
 import BVNForm from '@/components/organisms/BVNForm'
@@ -80,6 +83,10 @@ async function persistLookup(
 export default function Verify() {
   const navigate = useNavigate()
   const { isAuthenticated, profile } = useAuth()
+  const { hasQuota } = useSubscription()
+  const setMonthlyLookupCount = useAuthStore((s) => s.setMonthlyLookupCount)
+  const monthlyLookupCount = useAuthStore((s) => s.monthlyLookupCount)
+  const [showUpgrade, setShowUpgrade] = useState(false)
   const {
     activeService,
     step,
@@ -133,6 +140,10 @@ export default function Verify() {
 
   // ── BVN Step 2 (OTP) ────────────────────────────────────────────────────────
   async function handleOTPSubmit(data: OTPFormValues) {
+    if (isAuthenticated && !hasQuota) {
+      setShowUpgrade(true)
+      return
+    }
     setStep('loading')
     try {
       const res = await adjutorApi.verifyBVN(formData.bvn, data.otp)
@@ -145,6 +156,7 @@ export default function Verify() {
           res.data as unknown as Record<string, unknown>,
           'success'
         )
+        setMonthlyLookupCount((monthlyLookupCount ?? 0) + 1)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Invalid OTP. Please try again.'
@@ -166,6 +178,10 @@ export default function Verify() {
 
   // ── Account ─────────────────────────────────────────────────────────────────
   async function handleAccountSubmit(data: AccountFormValues) {
+    if (isAuthenticated && !hasQuota) {
+      setShowUpgrade(true)
+      return
+    }
     setStep('loading')
     try {
       const res = await adjutorApi.verifyAccount(data.account_number, data.bank_code)
@@ -178,6 +194,7 @@ export default function Verify() {
           res.data as unknown as Record<string, unknown>,
           'success'
         )
+        setMonthlyLookupCount((monthlyLookupCount ?? 0) + 1)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Account verification failed'
@@ -188,6 +205,10 @@ export default function Verify() {
 
   // ── Credit Report ───────────────────────────────────────────────────────────
   async function handleCreditSubmit(data: CreditReportFormValues) {
+    if (isAuthenticated && !hasQuota) {
+      setShowUpgrade(true)
+      return
+    }
     setStep('loading')
     setFormData({ bureau: data.bureau })
     try {
@@ -201,6 +222,7 @@ export default function Verify() {
           res.data as unknown as Record<string, unknown>,
           'success'
         )
+        setMonthlyLookupCount((monthlyLookupCount ?? 0) + 1)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to retrieve credit report'
@@ -238,6 +260,23 @@ export default function Verify() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <AppShell>
+      {/* Upgrade prompt modal */}
+      {showUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
+          <div className="max-w-md w-full bg-white rounded-2xl p-6 shadow-xl">
+            <UpgradePrompt onSuccess={() => setShowUpgrade(false)} />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full mt-2"
+              onClick={() => setShowUpgrade(false)}
+            >
+              Maybe Later
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Loading full-screen overlay */}
       {step === 'loading' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
