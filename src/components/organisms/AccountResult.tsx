@@ -8,6 +8,7 @@ import { useExport } from '@/hooks/useExport'
 import { useAuth } from '@/hooks/useAuth'
 import AIExplanation from '@/components/molecules/AIExplanation'
 import ShareResult from '@/components/molecules/ShareResult'
+import FeatureGate from '@/components/molecules/FeatureGate'
 
 interface AccountResultProps {
   data: AccountData
@@ -58,34 +59,40 @@ export default function AccountResult({
 
       {/* Export Actions */}
       <div className="flex flex-col sm:flex-row gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-1"
-          onClick={() => exportAccountPDF(data)}
-        >
-          <Download size={14} />
-          Download PDF
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-1"
-          onClick={() => exportResultJSON('account', data as unknown as Record<string, unknown>)}
-        >
-          <FileJson size={14} />
-          Download JSON
-        </Button>
-        {isAuthenticated && (
+        <FeatureGate feature="pdf_export" mode="overlay" className="flex-1">
           <Button
             size="sm"
             variant="outline"
-            className="flex-1"
-            onClick={() => emailResult('account', data as unknown as Record<string, unknown>)}
+            className="w-full"
+            onClick={() => exportAccountPDF(data)}
           >
-            <Mail size={14} />
-            Email to Me
+            <Download size={14} />
+            Download PDF
           </Button>
+        </FeatureGate>
+        <FeatureGate feature="json_export" mode="overlay" className="flex-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => exportResultJSON('account', data as unknown as Record<string, unknown>)}
+          >
+            <FileJson size={14} />
+            Download JSON
+          </Button>
+        </FeatureGate>
+        {isAuthenticated && (
+          <FeatureGate feature="email_export" mode="overlay" className="flex-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => emailResult('account', data as unknown as Record<string, unknown>)}
+            >
+              <Mail size={14} />
+              Email to Me
+            </Button>
+          </FeatureGate>
         )}
       </div>
 
@@ -96,10 +103,12 @@ export default function AccountResult({
       />
 
       {/* AI Explanation */}
-      <AIExplanation
-        serviceType="account"
-        resultData={data as unknown as Record<string, unknown>}
-      />
+      <FeatureGate feature="ai_advisor" mode="replace">
+        <AIExplanation
+          serviceType="account"
+          resultData={data as unknown as Record<string, unknown>}
+        />
+      </FeatureGate>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <Button variant="outline" className="flex-1" onClick={onCheckAnother}>

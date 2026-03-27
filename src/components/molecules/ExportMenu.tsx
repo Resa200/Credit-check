@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { Download } from 'lucide-react'
 import { useExport } from '@/hooks/useExport'
+import { useFeatureAccess } from '@/hooks/useFeatureAccess'
 import Button from '@/components/atoms/Button'
+import FeatureGate from '@/components/molecules/FeatureGate'
 import type { DataLookupRequestRow } from '@/types/supabase.types'
 
 interface ExportMenuProps {
@@ -10,6 +12,7 @@ interface ExportMenuProps {
 
 export default function ExportMenu({ rows }: ExportMenuProps) {
   const { exportHistoryCSV, exportHistoryJSON } = useExport()
+  const { canAccess } = useFeatureAccess()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -24,6 +27,17 @@ export default function ExportMenu({ rows }: ExportMenuProps) {
   }, [])
 
   if (rows.length === 0) return null
+
+  if (!canAccess('history_export')) {
+    return (
+      <FeatureGate feature="history_export" mode="overlay">
+        <Button size="sm" variant="outline">
+          <Download size={14} />
+          Export
+        </Button>
+      </FeatureGate>
+    )
+  }
 
   return (
     <div className="relative" ref={menuRef}>

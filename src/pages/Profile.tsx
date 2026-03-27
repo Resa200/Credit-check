@@ -10,6 +10,7 @@ import AuditLogTable from '@/components/organisms/AuditLogTable'
 import SubscriptionPanel from '@/components/organisms/SubscriptionPanel'
 import Button from '@/components/atoms/Button'
 import { cn } from '@/lib/utils'
+import FeatureGate from '@/components/molecules/FeatureGate'
 import type { HistoryFilters } from '@/hooks/useLookupHistory'
 
 type Tab = 'profile' | 'history' | 'audit' | 'subscription'
@@ -174,9 +175,17 @@ export default function Profile() {
           </div>
         )}
 
-        {activeTab === 'history' && <LookupHistoryTable initialFilters={initialFilters} />}
+        {activeTab === 'history' && (
+          <FeatureGate feature="lookup_history" mode="overlay">
+            <LookupHistoryTable initialFilters={initialFilters} />
+          </FeatureGate>
+        )}
         {activeTab === 'subscription' && <SubscriptionPanel />}
-        {activeTab === 'audit' && <AuditLogTable />}
+        {activeTab === 'audit' && (
+          <FeatureGate feature="audit_log" mode="overlay">
+            <AuditLogTable />
+          </FeatureGate>
+        )}
       </div>
     </AppShell>
   )
