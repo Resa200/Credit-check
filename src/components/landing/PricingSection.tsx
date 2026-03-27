@@ -144,7 +144,7 @@ export default function PricingSection() {
                 For professionals and businesses
               </p>
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold text-[#1E293B]">₦2,500</span>
+                <span className="text-4xl font-bold text-[#1E293B]">₦100</span>
                 <span className="text-[#94A3B8] text-sm">/month</span>
               </div>
               <p className="text-xs text-[#94A3B8] mt-1">Unlimited lookups</p>

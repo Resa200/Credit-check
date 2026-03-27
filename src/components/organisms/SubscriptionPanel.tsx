@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Crown, CreditCard, Trash2, Star, AlertTriangle } from 'lucide-react'
 import { useSubscription } from '@/hooks/useSubscription'
 import { usePaystackCards } from '@/hooks/usePaystackCards'
@@ -26,8 +26,9 @@ export default function SubscriptionPanel() {
     freeLimit,
     cancelSubscription,
     refreshSubscription,
+    initializePaystack,
   } = useSubscription()
-  const { cards, loading: cardsLoading, removeCard, setDefaultCard } = usePaystackCards()
+  const { cards, loading: cardsLoading, fetchCards, removeCard, setDefaultCard } = usePaystackCards()
   const profile = useAuthStore((s) => s.profile)
 
   const [transactions, setTransactions] = useState<PaymentTransactionRow[]>([])
@@ -35,8 +36,7 @@ export default function SubscriptionPanel() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
-  // Fetch billing history
-  useEffect(() => {
+  const fetchTransactions = useCallback(() => {
     if (!profile) return
     setTxLoading(true)
     supabase
@@ -51,6 +51,18 @@ export default function SubscriptionPanel() {
         setTxLoading(false)
       })
   }, [profile])
+
+  // Fetch billing history on mount
+  useEffect(() => {
+    fetchTransactions()
+  }, [fetchTransactions])
+
+  /** Refresh all panel data after a successful upgrade */
+  function handleUpgradeSuccess() {
+    refreshSubscription()
+    fetchCards()
+    fetchTransactions()
+  }
 
   async function handleCancel() {
     setCancelling(true)
@@ -160,7 +172,7 @@ export default function SubscriptionPanel() {
             </Button>
           )
         ) : (
-          <PaystackButton size="md" onSuccess={refreshSubscription}>
+          <PaystackButton size="md" onSuccess={handleUpgradeSuccess}>
             Upgrade to Pro
           </PaystackButton>
         )}
