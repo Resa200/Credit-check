@@ -6,6 +6,7 @@ import Button from '@/components/atoms/Button'
 import { Download, FileJson, Mail } from 'lucide-react'
 import { useExport } from '@/hooks/useExport'
 import { useAuth } from '@/hooks/useAuth'
+import AIExplanation from '@/components/molecules/AIExplanation'
 
 interface AccountResultProps {
   data: AccountData
@@ -86,6 +87,12 @@ export default function AccountResult({
           </Button>
         )}
       </div>
+
+      {/* AI Explanation */}
+      <AIExplanation
+        serviceType="account"
+        resultData={data as unknown as Record<string, unknown>}
+      />
 
       <div className="flex flex-col sm:flex-row gap-3">
         <Button variant="outline" className="flex-1" onClick={onCheckAnother}>

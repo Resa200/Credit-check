@@ -7,6 +7,7 @@ import Button from '@/components/atoms/Button'
 import { ShieldAlert, ShieldCheck, Download, FileJson, Mail } from 'lucide-react'
 import { useExport } from '@/hooks/useExport'
 import { useAuth } from '@/hooks/useAuth'
+import AIExplanation from '@/components/molecules/AIExplanation'
 
 interface BVNResultProps {
   data: BVNData
@@ -190,6 +191,12 @@ export default function BVNResult({ data, onCheckAnother, onBackToServices }: BV
           </Button>
         )}
       </div>
+
+      {/* AI Explanation */}
+      <AIExplanation
+        serviceType="bvn"
+        resultData={data as unknown as Record<string, unknown>}
+      />
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
