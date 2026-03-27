@@ -39,7 +39,6 @@ export default function FeatureGate({
     : `Sign in and upgrade to ${requiredPlan} to access ${label}.`
 
   const ctaAction = () => navigate(isAuthenticated ? '/profile' : '/login')
-  const ctaLabel = isAuthenticated ? 'Upgrade' : 'Sign In'
 
   if (mode === 'replace') {
     return (
@@ -60,7 +59,7 @@ export default function FeatureGate({
           <p className="text-xs text-[#94A3B8]">{requiredPlan} plan feature</p>
         </div>
         <span className="flex items-center gap-1 text-xs font-medium text-[#7C3AED] bg-[#EDE9FE] px-2.5 py-1 rounded-full whitespace-nowrap">
-          {ctaLabel}
+          Upgrade
           <ArrowRight size={12} />
         </span>
 
@@ -69,7 +68,7 @@ export default function FeatureGate({
     )
   }
 
-  // overlay mode — dim the child and show padlock on top
+  // overlay mode — dim the child and show a small lock badge
   return (
     <div
       className={cn('relative', className)}
@@ -77,23 +76,19 @@ export default function FeatureGate({
       onMouseLeave={() => setShowTooltip(false)}
     >
       {/* Dimmed child */}
-      <div className="opacity-40 pointer-events-none select-none" aria-hidden>
+      <div className="opacity-35 pointer-events-none select-none" aria-hidden>
         {children}
       </div>
 
-      {/* Lock overlay */}
+      {/* Small lock badge */}
       <div
         className="absolute inset-0 flex items-center justify-center cursor-pointer z-10"
         onClick={ctaAction}
       >
-        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-[#E2E8F0] shadow-lg rounded-full px-4 py-2">
-          <Lock size={14} className="text-[#94A3B8]" />
-          <span className="text-xs font-medium text-[#64748B]">
-            {requiredPlan} Plan
-          </span>
-          <span className="flex items-center gap-1 text-xs font-medium text-[#7C3AED]">
-            {ctaLabel}
-            <ArrowRight size={12} />
+        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm border border-[#E2E8F0] shadow-sm rounded-full px-2.5 py-1.5">
+          <Lock size={12} className="text-[#94A3B8]" />
+          <span className="text-[11px] font-medium text-[#7C3AED]">
+            {requiredPlan}
           </span>
         </div>
       </div>
@@ -105,7 +100,7 @@ export default function FeatureGate({
 
 function GateTooltip({ text }: { text: string }) {
   return (
-    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-64 rounded-xl border border-[#E2E8F0] bg-white p-3 text-xs text-[#1E293B] shadow-xl leading-relaxed pointer-events-none">
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-56 rounded-xl border border-[#E2E8F0] bg-white p-3 text-xs text-[#1E293B] shadow-xl leading-relaxed pointer-events-none">
       {text}
       <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-2 h-2 bg-white border-b border-r border-[#E2E8F0] rotate-45" />
     </div>

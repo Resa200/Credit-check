@@ -207,7 +207,7 @@ export default function BVNResult({ data, onCheckAnother, onBackToServices }: BV
       />
 
       {/* AI Explanation */}
-      <FeatureGate feature="ai_advisor" mode="replace">
+      <FeatureGate feature="ai_advisor" mode="overlay">
         <AIExplanation
           serviceType="bvn"
           resultData={data as unknown as Record<string, unknown>}

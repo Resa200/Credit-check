@@ -263,7 +263,7 @@ export default function CreditReportResult({
       />
 
       {/* AI Explanation */}
-      <FeatureGate feature="ai_advisor" mode="replace">
+      <FeatureGate feature="ai_advisor" mode="overlay">
         <AIExplanation
           serviceType="credit"
           resultData={data as unknown as Record<string, unknown>}

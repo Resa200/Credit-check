@@ -103,7 +103,7 @@ export default function AccountResult({
       />
 
       {/* AI Explanation */}
-      <FeatureGate feature="ai_advisor" mode="replace">
+      <FeatureGate feature="ai_advisor" mode="overlay">
         <AIExplanation
           serviceType="account"
           resultData={data as unknown as Record<string, unknown>}
