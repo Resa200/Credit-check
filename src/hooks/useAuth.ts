@@ -175,6 +175,16 @@ export function useAuth() {
     return data
   }, [])
 
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) throw error
+  }, [])
+
   const signOut = useCallback(async () => {
     if (profile) {
       createAuditLog({
@@ -231,6 +241,7 @@ export function useAuth() {
     isAuthenticated: !!session && !!profile,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     resetPassword,
     updatePassword,
