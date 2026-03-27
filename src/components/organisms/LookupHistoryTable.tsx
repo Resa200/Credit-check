@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { useLookupHistory } from '@/hooks/useLookupHistory'
+import type { HistoryFilters } from '@/hooks/useLookupHistory'
 import { cn } from '@/lib/utils'
 import Button from '@/components/atoms/Button'
 import Spinner from '@/components/atoms/Spinner'
@@ -18,11 +19,25 @@ const statusColors: Record<string, string> = {
   pending: 'bg-[#FEF9C3] text-[#CA8A04]',
 }
 
-export default function LookupHistoryTable() {
+interface LookupHistoryTableProps {
+  initialFilters?: HistoryFilters
+}
+
+export default function LookupHistoryTable({ initialFilters }: LookupHistoryTableProps) {
   const {
     rows, loading, page, totalPages, setPage, filters, setFilters,
   } = useLookupHistory()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // Apply initial filters from URL params (set by command bar)
+  useEffect(() => {
+    if (initialFilters && Object.keys(initialFilters).length > 0) {
+      setFilters(initialFilters)
+      setPage(0)
+    }
+  // Only apply on mount or when initialFilters reference changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFilters])
 
   return (
     <div className="flex flex-col gap-4">
@@ -42,6 +57,22 @@ export default function LookupHistoryTable() {
             <option value="bvn">BVN</option>
             <option value="account">Account</option>
             <option value="credit">Credit</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-[#94A3B8]">Status</label>
+          <select
+            value={filters.status ?? ''}
+            onChange={(e) => {
+              setFilters({ ...filters, status: e.target.value || undefined })
+              setPage(0)
+            }}
+            className="rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#1E293B] outline-none focus:border-[#7C3AED]"
+          >
+            <option value="">All</option>
+            <option value="success">Success</option>
+            <option value="error">Error</option>
+            <option value="pending">Pending</option>
           </select>
         </div>
         <div className="flex flex-col gap-1">

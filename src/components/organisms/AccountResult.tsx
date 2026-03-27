@@ -7,6 +7,7 @@ import { Download, FileJson, Mail } from 'lucide-react'
 import { useExport } from '@/hooks/useExport'
 import { useAuth } from '@/hooks/useAuth'
 import AIExplanation from '@/components/molecules/AIExplanation'
+import ShareResult from '@/components/molecules/ShareResult'
 
 interface AccountResultProps {
   data: AccountData
@@ -87,6 +88,12 @@ export default function AccountResult({
           </Button>
         )}
       </div>
+
+      {/* Share */}
+      <ShareResult
+        serviceType="account"
+        resultData={data as unknown as Record<string, unknown>}
+      />
 
       {/* AI Explanation */}
       <AIExplanation

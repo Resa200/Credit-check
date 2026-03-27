@@ -8,6 +8,7 @@ import { ShieldAlert, ShieldCheck, Download, FileJson, Mail } from 'lucide-react
 import { useExport } from '@/hooks/useExport'
 import { useAuth } from '@/hooks/useAuth'
 import AIExplanation from '@/components/molecules/AIExplanation'
+import ShareResult from '@/components/molecules/ShareResult'
 
 interface BVNResultProps {
   data: BVNData
@@ -191,6 +192,12 @@ export default function BVNResult({ data, onCheckAnother, onBackToServices }: BV
           </Button>
         )}
       </div>
+
+      {/* Share */}
+      <ShareResult
+        serviceType="bvn"
+        resultData={data as unknown as Record<string, unknown>}
+      />
 
       {/* AI Explanation */}
       <AIExplanation

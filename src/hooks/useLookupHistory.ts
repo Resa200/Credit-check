@@ -5,8 +5,9 @@ import type { DataLookupRequestRow } from '@/types/supabase.types'
 
 const PAGE_SIZE = 10
 
-interface Filters {
+export interface HistoryFilters {
   serviceType?: string
+  status?: string
   dateFrom?: string
   dateTo?: string
 }
@@ -17,7 +18,7 @@ export function useLookupHistory() {
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
-  const [filters, setFilters] = useState<Filters>({})
+  const [filters, setFilters] = useState<HistoryFilters>({})
 
   const fetchHistory = useCallback(async () => {
     if (!profile) return
@@ -33,6 +34,9 @@ export function useLookupHistory() {
 
     if (filters.serviceType) {
       query = query.eq('service_type', filters.serviceType)
+    }
+    if (filters.status) {
+      query = query.eq('status', filters.status)
     }
     if (filters.dateFrom) {
       query = query.gte('created_on', filters.dateFrom)

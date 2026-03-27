@@ -10,6 +10,7 @@ import AuditLogTable from '@/components/organisms/AuditLogTable'
 import SubscriptionPanel from '@/components/organisms/SubscriptionPanel'
 import Button from '@/components/atoms/Button'
 import { cn } from '@/lib/utils'
+import type { HistoryFilters } from '@/hooks/useLookupHistory'
 
 type Tab = 'profile' | 'history' | 'audit' | 'subscription'
 
@@ -27,11 +28,29 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState<Tab>('profile')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Support ?tab=subscription URL param (from QuotaBanner link)
+  // Support URL params: ?tab=history&serviceType=bvn&status=error&dateFrom=...&dateTo=...
+  const [initialFilters, setInitialFilters] = useState<HistoryFilters | undefined>(undefined)
+
   useEffect(() => {
     const tab = searchParams.get('tab') as Tab | null
     if (tab && tabs.some((t) => t.key === tab)) {
       setActiveTab(tab)
+    }
+
+    // Read filter params for history tab (set by command bar)
+    if (tab === 'history') {
+      const filters: HistoryFilters = {}
+      const serviceType = searchParams.get('serviceType')
+      const status = searchParams.get('status')
+      const dateFrom = searchParams.get('dateFrom')
+      const dateTo = searchParams.get('dateTo')
+      if (serviceType) filters.serviceType = serviceType
+      if (status) filters.status = status
+      if (dateFrom) filters.dateFrom = dateFrom
+      if (dateTo) filters.dateTo = dateTo
+      if (Object.keys(filters).length > 0) {
+        setInitialFilters(filters)
+      }
     }
   }, [searchParams])
   const [deleting, setDeleting] = useState(false)
@@ -155,7 +174,7 @@ export default function Profile() {
           </div>
         )}
 
-        {activeTab === 'history' && <LookupHistoryTable />}
+        {activeTab === 'history' && <LookupHistoryTable initialFilters={initialFilters} />}
         {activeTab === 'subscription' && <SubscriptionPanel />}
         {activeTab === 'audit' && <AuditLogTable />}
       </div>

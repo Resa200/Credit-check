@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { useExport } from '@/hooks/useExport'
 import { useAuth } from '@/hooks/useAuth'
 import AIExplanation from '@/components/molecules/AIExplanation'
+import ShareResult from '@/components/molecules/ShareResult'
 
 interface CreditReportResultProps {
   data: CreditReportData
@@ -247,6 +248,12 @@ export default function CreditReportResult({
           </Button>
         )}
       </div>
+
+      {/* Share */}
+      <ShareResult
+        serviceType="credit"
+        resultData={data as unknown as Record<string, unknown>}
+      />
 
       {/* AI Explanation */}
       <AIExplanation

@@ -12,6 +12,8 @@ import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
 import Profile from '@/pages/Profile'
 import AuthCallback from '@/pages/AuthCallback'
+import ShareView from '@/pages/ShareView'
+import CommandBar from '@/components/organisms/CommandBar'
 
 function LandingWithShell() {
   return (
@@ -36,6 +38,7 @@ export default function App() {
           },
         }}
       />
+      <CommandBar />
       <Routes>
         <Route path="/" element={<LandingWithShell />} />
         <Route path="/services" element={<Services />} />
@@ -53,6 +56,7 @@ export default function App() {
             </AuthGuard>
           }
         />
+        <Route path="/share" element={<ShareView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
