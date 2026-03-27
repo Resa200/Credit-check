@@ -141,39 +141,258 @@ function buildAccountHtml(data: Record<string, unknown>): string {
   `
 }
 
-function buildCreditHtml(data: Record<string, unknown>): string {
-  // Try to extract normalized fields
-  const fullName = String(data.fullName ?? data.full_name ?? data.name ?? 'Credit Report')
-  const score = data.creditScore ?? data.credit_score
-  const maxScore = data.maxScore ?? data.max_score ?? 850
+// ─── Normalization helpers (mirrors client-side normalizeCreditReport) ────────
 
+interface NormalizedCredit {
+  fullName?: string
+  dateOfBirth?: string
+  gender?: string
+  phone?: string
+  address?: string
+  identifications?: { type: string; value: string }[]
+  creditScore?: number
+  maxScore?: number
+  creditStats?: { label: string; value: string }[]
+  facilitySections?: { label: string; hasFacilities: boolean; delinquentCount: number; lastReportedDate?: string }[]
+  loans?: Record<string, unknown>[]
+  enquiries?: Record<string, unknown>[]
+  lastCheckedDate?: string
+}
+
+// deno-lint-ignore no-explicit-any
+function normalizeCreditData(data: any): NormalizedCredit {
+  // ── FirstCentral: data is an array ──
+  if (Array.isArray(data)) {
+    const pd = data.find((i: Record<string, unknown>) => i.PersonalDetailsSummary)?.PersonalDetailsSummary?.[0]
+    const cs = data.find((i: Record<string, unknown>) => i.CreditSummary)?.CreditSummary?.[0]
+    const perf = data.find((i: Record<string, unknown>) => i.PerformanceClassification)?.PerformanceClassification?.[0]
+
+    const fullName = pd
+      ? [pd.Surname, pd.FirstName, pd.OtherNames].filter(Boolean).join(' ')
+      : undefined
+
+    const address = [pd?.ResidentialAddress1, pd?.ResidentialAddress2].filter(Boolean).join(', ') || undefined
+
+    const identifications: { type: string; value: string }[] = []
+    if (pd?.BankVerificationNo) identifications.push({ type: 'BVN', value: pd.BankVerificationNo })
+    if (pd?.NationalIDNo) identifications.push({ type: 'NIN', value: pd.NationalIDNo })
+    if (pd?.PassportNo) identifications.push({ type: 'Passport', value: pd.PassportNo })
+    if (pd?.DriversLicenseNo) identifications.push({ type: "Driver's License", value: pd.DriversLicenseNo })
+    if (pd?.PencomIDNo) identifications.push({ type: 'PenCom ID', value: pd.PencomIDNo })
+
+    const creditStats: { label: string; value: string }[] = []
+    if (cs?.TotalNumberOfAccountsReported) creditStats.push({ label: 'Total Accounts', value: cs.TotalNumberOfAccountsReported })
+    if (cs?.NumberOfAccountsInGoodStanding) creditStats.push({ label: 'Good Standing', value: cs.NumberOfAccountsInGoodStanding })
+    if (cs?.NumberOfAccountsInBadStanding) creditStats.push({ label: 'Bad Standing', value: cs.NumberOfAccountsInBadStanding })
+    if (perf?.NoOfLoansPerforming) creditStats.push({ label: 'Performing Loans', value: perf.NoOfLoansPerforming })
+    if (perf?.NoOfLoansSubstandard) creditStats.push({ label: 'Substandard', value: perf.NoOfLoansSubstandard })
+    if (perf?.NoOfLoansDoubtful) creditStats.push({ label: 'Doubtful', value: perf.NoOfLoansDoubtful })
+    if (perf?.NoOfLoansLost) creditStats.push({ label: 'Lost', value: perf.NoOfLoansLost })
+
+    return {
+      fullName,
+      dateOfBirth: pd?.BirthDate,
+      gender: pd?.Gender ? capitalize(pd.Gender) : undefined,
+      phone: pd?.CellularNo || pd?.HomeTelephoneNo || pd?.WorkTelephoneNo,
+      address,
+      identifications: identifications.length ? identifications : undefined,
+      creditStats: creditStats.length ? creditStats : undefined,
+    }
+  }
+
+  // ── CRC: object with nano_consumer_profile ──
+  if (data?.nano_consumer_profile) {
+    const cd = data.nano_consumer_profile.consumer_details
+
+    const identifications = (cd?.identification ?? []).map((id: Record<string, string>) => ({
+      type: id.id_display_name,
+      value: id.id_value,
+    }))
+
+    const facilitySections: NormalizedCredit['facilitySections'] = []
+    const creditSummary = data.credit_nano_summary?.summary
+    if (creditSummary) {
+      facilitySections.push({
+        label: 'Bank Credit',
+        hasFacilities: creditSummary.has_creditfacilities === 'YES',
+        delinquentCount: parseInt(creditSummary.no_of_delinqcreditfacilities ?? '0', 10),
+        lastReportedDate: creditSummary.last_reported_date,
+      })
+    }
+    const mfSummary = data.mfcredit_nano_summary?.summary
+    if (mfSummary) {
+      facilitySections.push({
+        label: 'Microfinance Credit',
+        hasFacilities: mfSummary.has_creditfacilities === 'YES',
+        delinquentCount: parseInt(mfSummary.no_of_delinqcreditfacilities ?? '0', 10),
+        lastReportedDate: mfSummary.last_reported_date,
+      })
+    }
+    const mgSummary = data.mgcredit_nano_summary?.summary
+    if (mgSummary) {
+      facilitySections.push({
+        label: 'Mortgage Credit',
+        hasFacilities: mgSummary.has_creditfacilities === 'YES',
+        delinquentCount: parseInt(mgSummary.no_of_delinqcreditfacilities ?? '0', 10),
+        lastReportedDate: mgSummary.last_reported_date,
+      })
+    }
+
+    return {
+      fullName: cd?.name,
+      dateOfBirth: cd?.date_of_birth,
+      gender: cd?.gender ? capitalize(cd.gender) : undefined,
+      identifications: identifications.length ? identifications : undefined,
+      facilitySections: facilitySections.length ? facilitySections : undefined,
+      lastCheckedDate: data.last_checked_date,
+    }
+  }
+
+  // ── Generic object fallback ──
+  return {
+    fullName: data.personal_info?.full_name ?? data.fullName ?? data.full_name ?? data.name,
+    dateOfBirth: data.personal_info?.date_of_birth ?? data.dateOfBirth ?? data.date_of_birth,
+    gender: data.personal_info?.gender ?? data.gender,
+    phone: data.personal_info?.phone ?? data.phone,
+    address: data.personal_info?.address ?? data.address,
+    creditScore: data.credit_summary?.credit_score ?? data.creditScore ?? data.credit_score,
+    maxScore: data.credit_summary?.max_score ?? data.maxScore ?? data.max_score,
+    loans: data.loan_history ?? data.loans,
+    enquiries: data.enquiry_history ?? data.enquiries,
+  }
+}
+
+// ─── Credit HTML builder ─────────────────────────────────────────────────────
+
+function buildCreditHtml(data: Record<string, unknown>): string {
+  const n = normalizeCreditData(data)
+  const displayName = n.fullName || 'Credit Report'
+  const generatedDate = new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  // Personal information section
   const personalRows = [
-    data.fullName || data.full_name ? dataRow('Full Name', fullName) : '',
-    data.dateOfBirth || data.date_of_birth ? dataRow('Date of Birth', String(data.dateOfBirth ?? data.date_of_birth)) : '',
-    data.gender ? dataRow('Gender', String(data.gender)) : '',
-    data.phone ? dataRow('Phone', String(data.phone)) : '',
-    data.address ? dataRow('Address', String(data.address)) : '',
+    n.fullName ? dataRow('Full Name', n.fullName) : '',
+    n.dateOfBirth ? dataRow('Date of Birth', n.dateOfBirth) : '',
+    n.gender ? dataRow('Gender', n.gender) : '',
+    n.phone ? dataRow('Phone', maskValue(n.phone, 4, 3)) : '',
+    n.address ? dataRow('Address', n.address) : '',
   ].join('')
 
-  const scoreHtml = score != null ? `
-    <div style="text-align: center; background: #FAFAFA; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin-bottom: 16px;">
-      <p style="margin: 0 0 8px; font-size: 12px; color: #94A3B8; text-transform: uppercase;">Credit Score</p>
-      <p style="margin: 0; font-size: 36px; font-weight: 700; color: #7C3AED;">${score}</p>
-      <p style="margin: 4px 0 0; font-size: 12px; color: #94A3B8;">out of ${maxScore}</p>
-    </div>
-  ` : ''
+  // Identifications section
+  let identificationsHtml = ''
+  if (n.identifications && n.identifications.length > 0) {
+    const idRows = n.identifications
+      .map((id) => dataRow(id.type, maskValue(id.value, 3, 3)))
+      .join('')
+    identificationsHtml = sectionCard('Identification', idRows)
+  }
 
-  // Handle loans array if present
-  const loans = data.loans as Array<Record<string, unknown>> | undefined
+  // Credit score section
+  let scoreHtml = ''
+  if (n.creditScore != null) {
+    const max = n.maxScore ?? 850
+    scoreHtml = `
+      <div style="text-align: center; background: #FAFAFA; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin-bottom: 16px;">
+        <p style="margin: 0 0 8px; font-size: 12px; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">Credit Score</p>
+        <p style="margin: 0; font-size: 36px; font-weight: 700; color: #7C3AED;">${n.creditScore}</p>
+        <p style="margin: 4px 0 0; font-size: 12px; color: #94A3B8;">out of ${max}</p>
+      </div>
+    `
+  }
+
+  // Credit stats (FirstCentral: Total Accounts, Good/Bad Standing, Performing Loans, etc.)
+  let creditStatsHtml = ''
+  if (n.creditStats && n.creditStats.length > 0) {
+    // Render as a grid of stat cards
+    const statCards = n.creditStats.map((stat) => {
+      let valueColor = '#1E293B'
+      const lbl = stat.label.toLowerCase()
+      if (lbl.includes('good') || lbl.includes('performing')) valueColor = '#059669'
+      if (lbl.includes('bad') || lbl.includes('substandard') || lbl.includes('doubtful') || lbl.includes('lost')) {
+        valueColor = parseInt(stat.value) > 0 ? '#F43F5E' : '#94A3B8'
+      }
+      return `
+        <td style="width: 50%; padding: 12px; text-align: center; vertical-align: top;">
+          <p style="margin: 0; font-size: 24px; font-weight: 700; color: ${valueColor};">${stat.value}</p>
+          <p style="margin: 4px 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">${stat.label}</p>
+        </td>
+      `
+    }).join('')
+
+    // Arrange in rows of 2
+    let gridRows = ''
+    for (let i = 0; i < n.creditStats.length; i += 2) {
+      const cells = [statCards[i]]
+      if (i + 1 < n.creditStats.length) {
+        // deno-lint-ignore no-explicit-any
+        cells.push((statCards as any)[i + 1])
+      } else {
+        cells.push('<td></td>')
+      }
+      // Re-generate directly to avoid indexing the joined string
+      gridRows += '<tr>'
+      const stat1 = n.creditStats[i]
+      let vc1 = '#1E293B'
+      const l1 = stat1.label.toLowerCase()
+      if (l1.includes('good') || l1.includes('performing')) vc1 = '#059669'
+      if (l1.includes('bad') || l1.includes('substandard') || l1.includes('doubtful') || l1.includes('lost')) vc1 = parseInt(stat1.value) > 0 ? '#F43F5E' : '#94A3B8'
+      gridRows += `<td style="width: 50%; padding: 12px; text-align: center; vertical-align: top;">
+        <p style="margin: 0; font-size: 24px; font-weight: 700; color: ${vc1};">${stat1.value}</p>
+        <p style="margin: 4px 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">${stat1.label}</p>
+      </td>`
+      if (i + 1 < n.creditStats.length) {
+        const stat2 = n.creditStats[i + 1]
+        let vc2 = '#1E293B'
+        const l2 = stat2.label.toLowerCase()
+        if (l2.includes('good') || l2.includes('performing')) vc2 = '#059669'
+        if (l2.includes('bad') || l2.includes('substandard') || l2.includes('doubtful') || l2.includes('lost')) vc2 = parseInt(stat2.value) > 0 ? '#F43F5E' : '#94A3B8'
+        gridRows += `<td style="width: 50%; padding: 12px; text-align: center; vertical-align: top;">
+          <p style="margin: 0; font-size: 24px; font-weight: 700; color: ${vc2};">${stat2.value}</p>
+          <p style="margin: 4px 0 0; font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">${stat2.label}</p>
+        </td>`
+      } else {
+        gridRows += '<td style="width: 50%;"></td>'
+      }
+      gridRows += '</tr>'
+    }
+
+    creditStatsHtml = `
+      <div style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; margin-bottom: 16px;">
+        ${sectionHeader('Credit Summary')}
+        <table style="width: 100%; border-collapse: collapse;">
+          ${gridRows}
+        </table>
+      </div>
+    `
+  }
+
+  // Facility sections (CRC: Bank Credit, Microfinance, Mortgage)
+  let facilitiesHtml = ''
+  if (n.facilitySections && n.facilitySections.length > 0) {
+    const facilityRows = n.facilitySections.map((fs) => {
+      const hasColor = fs.hasFacilities ? '#059669' : '#94A3B8'
+      const hasLabel = fs.hasFacilities ? 'Yes' : 'No'
+      const delinqColor = fs.delinquentCount > 0 ? '#F43F5E' : '#059669'
+      return `
+        ${dataRow(fs.label, `<span style="color: ${hasColor}; font-weight: 600;">${hasLabel}</span>`)}
+        ${dataRow(`${fs.label} — Delinquent`, `<span style="color: ${delinqColor}; font-weight: 600;">${fs.delinquentCount}</span>`)}
+        ${fs.lastReportedDate ? dataRow(`${fs.label} — Last Reported`, fs.lastReportedDate) : ''}
+      `
+    }).join('')
+
+    facilitiesHtml = sectionCard('Credit Facilities', facilityRows)
+  }
+
+  // Loans table
   let loansHtml = ''
-  if (loans && Array.isArray(loans) && loans.length > 0) {
-    const loanRows = loans.slice(0, 10).map((loan) => `
+  if (n.loans && Array.isArray(n.loans) && n.loans.length > 0) {
+    const loanRows = n.loans.slice(0, 10).map((loan: Record<string, unknown>) => `
       <tr>
         <td style="padding: 8px 12px; font-size: 12px; color: #1E293B; border-bottom: 1px solid #F1F5F9;">${loan.institution ?? loan.lender ?? '—'}</td>
         <td style="padding: 8px 12px; font-size: 12px; color: #1E293B; border-bottom: 1px solid #F1F5F9;">${loan.type ?? loan.loan_type ?? '—'}</td>
-        <td style="padding: 8px 12px; font-size: 12px; color: #1E293B; border-bottom: 1px solid #F1F5F9; text-align: right;">${loan.amount ?? loan.balance ?? '—'}</td>
+        <td style="padding: 8px 12px; font-size: 12px; color: #1E293B; border-bottom: 1px solid #F1F5F9; text-align: right;">${loan.amount ?? loan.loan_amount ?? loan.balance ?? '—'}</td>
         <td style="padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #F1F5F9; text-align: right;">
-          <span style="color: ${loan.status === 'Closed' || loan.status === 'closed' ? '#059669' : '#F59E0B'};">${loan.status ?? '—'}</span>
+          <span style="color: ${String(loan.status).toLowerCase() === 'closed' ? '#059669' : '#F59E0B'};">${loan.status ?? '—'}</span>
         </td>
       </tr>
     `).join('')
@@ -190,20 +409,56 @@ function buildCreditHtml(data: Record<string, unknown>): string {
           </tr>
           ${loanRows}
         </table>
-        ${loans.length > 10 ? '<p style="padding: 12px; font-size: 12px; color: #94A3B8; text-align: center;">Showing 10 of ' + loans.length + ' loans. View full report on CreditCheck.</p>' : ''}
+        ${n.loans.length > 10 ? '<p style="padding: 12px; font-size: 12px; color: #94A3B8; text-align: center;">Showing 10 of ' + n.loans.length + ' loans</p>' : ''}
       </div>
     `
   }
 
+  // Enquiries table
+  let enquiriesHtml = ''
+  if (n.enquiries && Array.isArray(n.enquiries) && n.enquiries.length > 0) {
+    const enquiryRows = n.enquiries.slice(0, 10).map((eq: Record<string, unknown>) => `
+      <tr>
+        <td style="padding: 8px 12px; font-size: 12px; color: #1E293B; border-bottom: 1px solid #F1F5F9;">${eq.institution ?? '—'}</td>
+        <td style="padding: 8px 12px; font-size: 12px; color: #1E293B; border-bottom: 1px solid #F1F5F9;">${eq.purpose ?? '—'}</td>
+        <td style="padding: 8px 12px; font-size: 12px; color: #1E293B; border-bottom: 1px solid #F1F5F9; text-align: right;">${eq.enquiry_date ?? '—'}</td>
+      </tr>
+    `).join('')
+
+    enquiriesHtml = `
+      <div style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; margin-bottom: 16px;">
+        ${sectionHeader('Enquiry History')}
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr style="background: #FAFAFA;">
+            <th style="padding: 8px 12px; font-size: 11px; color: #94A3B8; text-align: left; border-bottom: 1px solid #E2E8F0;">Institution</th>
+            <th style="padding: 8px 12px; font-size: 11px; color: #94A3B8; text-align: left; border-bottom: 1px solid #E2E8F0;">Purpose</th>
+            <th style="padding: 8px 12px; font-size: 11px; color: #94A3B8; text-align: right; border-bottom: 1px solid #E2E8F0;">Date</th>
+          </tr>
+          ${enquiryRows}
+        </table>
+      </div>
+    `
+  }
+
+  // Last checked date
+  const lastChecked = n.lastCheckedDate
+    ? `<p style="margin: 4px 0 0; font-size: 12px; color: #94A3B8;">Last checked: ${n.lastCheckedDate}</p>`
+    : ''
+
   return `
     <div style="text-align: center; margin-bottom: 20px;">
       ${statusBadge('success', 'Report Retrieved')}
-      <h2 style="margin: 12px 0 0; color: #1E293B; font-size: 20px;">${fullName}</h2>
-      <p style="margin: 4px 0 0; font-size: 12px; color: #94A3B8;">Generated ${new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+      <h2 style="margin: 12px 0 0; color: #1E293B; font-size: 20px;">${displayName}</h2>
+      <p style="margin: 4px 0 0; font-size: 12px; color: #94A3B8;">Generated ${generatedDate}</p>
+      ${lastChecked}
     </div>
     ${scoreHtml}
     ${sectionCard('Personal Information', personalRows)}
+    ${identificationsHtml}
+    ${creditStatsHtml}
+    ${facilitiesHtml}
     ${loansHtml}
+    ${enquiriesHtml}
   `
 }
 
