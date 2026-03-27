@@ -3,6 +3,9 @@ import DataRow from '@/components/molecules/DataRow'
 import StatusBadge from '@/components/molecules/StatusBadge'
 import MaskedText from '@/components/atoms/MaskedText'
 import Button from '@/components/atoms/Button'
+import { Download, FileJson, Mail } from 'lucide-react'
+import { useExport } from '@/hooks/useExport'
+import { useAuth } from '@/hooks/useAuth'
 
 interface AccountResultProps {
   data: AccountData
@@ -15,6 +18,9 @@ export default function AccountResult({
   onCheckAnother,
   onBackToServices,
 }: AccountResultProps) {
+  const { exportAccountPDF, exportResultJSON, emailResult } = useExport()
+  const { isAuthenticated } = useAuth()
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3 text-center">
@@ -46,6 +52,39 @@ export default function AccountResult({
             }
           />
         </div>
+      </div>
+
+      {/* Export Actions */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => exportAccountPDF(data)}
+        >
+          <Download size={14} />
+          Download PDF
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => exportResultJSON('account', data as unknown as Record<string, unknown>)}
+        >
+          <FileJson size={14} />
+          Download JSON
+        </Button>
+        {isAuthenticated && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => emailResult('account', data as unknown as Record<string, unknown>)}
+          >
+            <Mail size={14} />
+            Email to Me
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">

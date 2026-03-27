@@ -4,7 +4,9 @@ import DataRow from '@/components/molecules/DataRow'
 import StatusBadge from '@/components/molecules/StatusBadge'
 import MaskedText from '@/components/atoms/MaskedText'
 import Button from '@/components/atoms/Button'
-import { ShieldAlert, ShieldCheck } from 'lucide-react'
+import { ShieldAlert, ShieldCheck, Download, FileJson, Mail } from 'lucide-react'
+import { useExport } from '@/hooks/useExport'
+import { useAuth } from '@/hooks/useAuth'
 
 interface BVNResultProps {
   data: BVNData
@@ -37,6 +39,8 @@ function resolveImage(data: BVNData): string | null {
 }
 
 export default function BVNResult({ data, onCheckAnother, onBackToServices }: BVNResultProps) {
+  const { exportBVNPDF, exportResultJSON, emailResult } = useExport()
+  const { isAuthenticated } = useAuth()
   const fullName = buildFullName(data.first_name, data.middle_name, data.last_name)
   const photo = resolveImage(data)
   const dob = data.formatted_dob || data.dob
@@ -153,6 +157,39 @@ export default function BVNResult({ data, onCheckAnother, onBackToServices }: BV
           <DataRow label="Account Level" value={capitalise(data.level_of_account)} />
         )}
       </Section>
+
+      {/* Export Actions */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => exportBVNPDF(data)}
+        >
+          <Download size={14} />
+          Download PDF
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => exportResultJSON('bvn', data as unknown as Record<string, unknown>)}
+        >
+          <FileJson size={14} />
+          Download JSON
+        </Button>
+        {isAuthenticated && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => emailResult('bvn', data as unknown as Record<string, unknown>)}
+          >
+            <Mail size={14} />
+            Email to Me
+          </Button>
+        )}
+      </div>
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">

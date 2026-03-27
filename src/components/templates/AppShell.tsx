@@ -1,11 +1,16 @@
 import { Shield } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
+import UserMenu from '@/components/molecules/UserMenu'
+import Button from '@/components/atoms/Button'
 
 interface AppShellProps {
   children: React.ReactNode
 }
 
 export default function AppShell({ children }: AppShellProps) {
+  const { isAuthenticated, loading } = useAuth()
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
       {/* Header */}
@@ -19,9 +24,19 @@ export default function AppShell({ children }: AppShellProps) {
               CreditCheck
             </span>
           </Link>
-          <span className="text-xs text-[#94A3B8] hidden sm:block">
-            Powered by Adjutor
-          </span>
+          <div className="flex items-center gap-3">
+            {!loading && (
+              isAuthenticated ? (
+                <UserMenu />
+              ) : (
+                <Link to="/login">
+                  <Button size="sm" variant="outline">
+                    Sign In
+                  </Button>
+                </Link>
+              )
+            )}
+          </div>
         </div>
       </header>
 
@@ -34,10 +49,12 @@ export default function AppShell({ children }: AppShellProps) {
       <footer className="border-t border-[#E2E8F0] bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-xs text-[#94A3B8]">
-            © {new Date().getFullYear()} CreditCheck · Powered by Adjutor
+            &copy; {new Date().getFullYear()} CreditCheck &middot; Powered by Adjutor
           </p>
           <p className="text-xs text-[#94A3B8]">
-            Your data is never stored or shared.
+            {isAuthenticated
+              ? 'Your data is securely stored in your account.'
+              : 'Sign in to save your verification history.'}
           </p>
         </div>
       </footer>

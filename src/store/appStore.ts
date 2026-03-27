@@ -25,6 +25,9 @@ interface AppState {
   // error message
   error: string | null
 
+  // whether an unauthenticated user has already used their free lookup
+  guestLookupUsed: boolean
+
   // actions
   selectService: (service: ServiceType) => void
   setStep: (step: AppStep) => void
@@ -33,6 +36,7 @@ interface AppState {
   setAccountResult: (data: AccountData) => void
   setCreditResult: (data: CreditReportData) => void
   setError: (msg: string) => void
+  markGuestLookupUsed: () => void
   reset: () => void
   goToServices: () => void
 }
@@ -45,6 +49,7 @@ const initialState = {
   accountResult: null,
   creditResult: null,
   error: null,
+  guestLookupUsed: false,
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -66,10 +71,15 @@ export const useAppStore = create<AppState>((set) => ({
 
   setError: (msg) => set({ error: msg, step: 'error' }),
 
-  reset: () => set({ ...initialState }),
+  markGuestLookupUsed: () => set({ guestLookupUsed: true }),
+
+  reset: () => set((state) => ({
+    ...initialState,
+    guestLookupUsed: state.guestLookupUsed,
+  })),
 
   goToServices: () =>
-    set({
+    set((state) => ({
       step: 'select',
       activeService: null,
       error: null,
@@ -77,5 +87,6 @@ export const useAppStore = create<AppState>((set) => ({
       bvnResult: null,
       accountResult: null,
       creditResult: null,
-    }),
+      guestLookupUsed: state.guestLookupUsed,
+    })),
 }))

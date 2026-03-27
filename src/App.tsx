@@ -1,9 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import AppShell from '@/components/templates/AppShell'
+import AuthGuard from '@/components/molecules/AuthGuard'
 import Landing from '@/pages/Landing'
 import Services from '@/pages/Services'
 import Verify from '@/pages/Verify'
+import Login from '@/pages/Login'
+import Signup from '@/pages/Signup'
+import ForgotPassword from '@/pages/ForgotPassword'
+import ResetPassword from '@/pages/ResetPassword'
+import Profile from '@/pages/Profile'
 
 function LandingWithShell() {
   return (
@@ -30,6 +36,18 @@ export default function App() {
         <Route path="/" element={<LandingWithShell />} />
         <Route path="/services" element={<Services />} />
         <Route path="/verify" element={<Verify />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route
+          path="/profile"
+          element={
+            <AuthGuard>
+              <Profile />
+            </AuthGuard>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

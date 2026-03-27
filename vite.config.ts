@@ -18,6 +18,7 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           pdf: ['jspdf', 'html2canvas'],
+          supabase: ['@supabase/supabase-js'],
         },
       },
     },

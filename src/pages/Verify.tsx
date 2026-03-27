@@ -2,10 +2,14 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store/appStore'
+import { useAuth } from '@/hooks/useAuth'
 import { adjutorApi } from '@/hooks/useAdjutor'
+import { supabase } from '@/lib/supabase'
+import { createAuditLog } from '@/lib/audit'
 import AppShell from '@/components/templates/AppShell'
 import ServiceLayout from '@/components/templates/ServiceLayout'
 import Spinner from '@/components/atoms/Spinner'
+import SaveResultPrompt from '@/components/molecules/SaveResultPrompt'
 
 // Forms
 import BVNForm from '@/components/organisms/BVNForm'
@@ -39,8 +43,43 @@ const serviceInfo = {
   },
 }
 
+async function persistLookup(
+  profileId: string,
+  serviceType: 'bvn' | 'account' | 'credit',
+  requestPayload: Record<string, unknown>,
+  responsePayload: Record<string, unknown>,
+  status: 'success' | 'error'
+) {
+  const { data: lookup } = await supabase
+    .from('data_lookup_requests')
+    .insert({
+      user_id: profileId,
+      service_type: serviceType,
+      request_payload: requestPayload,
+      response_payload: responsePayload,
+      status,
+      adjutor_reference: null,
+      meta: null,
+      created_by: profileId,
+      modified_by: profileId,
+    })
+    .select('id')
+    .single()
+
+  if (lookup) {
+    await createAuditLog({
+      userId: profileId,
+      action: `${serviceType}_lookup`,
+      resourceType: 'data_lookup_requests',
+      resourceId: lookup.id,
+      details: { status },
+    })
+  }
+}
+
 export default function Verify() {
   const navigate = useNavigate()
+  const { isAuthenticated, profile } = useAuth()
   const {
     activeService,
     step,
@@ -49,12 +88,14 @@ export default function Verify() {
     accountResult,
     creditResult,
     error,
+    guestLookupUsed,
     setStep,
     setFormData,
     setBVNResult,
     setAccountResult,
     setCreditResult,
     setError,
+    markGuestLookupUsed,
     reset,
     goToServices,
   } = useAppStore()
@@ -63,6 +104,14 @@ export default function Verify() {
   useEffect(() => {
     if (!activeService) navigate('/services')
   }, [activeService, navigate])
+
+  // Gate: unauthenticated users who already used their free lookup must sign in
+  useEffect(() => {
+    if (!isAuthenticated && guestLookupUsed && step === 'input') {
+      toast.error('Sign in to continue performing lookups')
+      navigate('/login')
+    }
+  }, [isAuthenticated, guestLookupUsed, step, navigate])
 
   if (!activeService) return null
 
@@ -73,7 +122,7 @@ export default function Verify() {
     setStep('loading')
     try {
       const res = await adjutorApi.initiateBVN(data.bvn, data.contact)
-      setFormData({ bvn: data.bvn, maskedContact: res.data })
+      setFormData({ bvn: data.bvn, contact: data.contact, maskedContact: res.data })
       setStep('otp')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send OTP'
@@ -88,6 +137,15 @@ export default function Verify() {
     try {
       const res = await adjutorApi.verifyBVN(formData.bvn, data.otp)
       setBVNResult(res.data)
+      if (!isAuthenticated) markGuestLookupUsed()
+      if (isAuthenticated && profile) {
+        await persistLookup(
+          profile.id, 'bvn',
+          { bvn: formData.bvn, contact: formData.contact },
+          res.data as unknown as Record<string, unknown>,
+          'success'
+        )
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Invalid OTP. Please try again.'
       setError(message)
@@ -112,6 +170,15 @@ export default function Verify() {
     try {
       const res = await adjutorApi.verifyAccount(data.account_number, data.bank_code)
       setAccountResult(res.data)
+      if (!isAuthenticated) markGuestLookupUsed()
+      if (isAuthenticated && profile) {
+        await persistLookup(
+          profile.id, 'account',
+          { account_number: data.account_number, bank_code: data.bank_code },
+          res.data as unknown as Record<string, unknown>,
+          'success'
+        )
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Account verification failed'
       setError(message)
@@ -126,11 +193,46 @@ export default function Verify() {
     try {
       const res = await adjutorApi.getCreditReport(data.bureau, data.bvn)
       setCreditResult(res.data)
+      if (!isAuthenticated) markGuestLookupUsed()
+      if (isAuthenticated && profile) {
+        await persistLookup(
+          profile.id, 'credit',
+          { bvn: data.bvn, bureau: data.bureau },
+          res.data as unknown as Record<string, unknown>,
+          'success'
+        )
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to retrieve credit report'
       setError(message)
       toast.error(message)
     }
+  }
+
+  // ── Build request/response payloads for SaveResultPrompt ──────────────────
+  function getSavePromptProps() {
+    if (activeService === 'bvn' && bvnResult) {
+      return {
+        serviceType: 'bvn' as const,
+        requestPayload: { bvn: formData.bvn, contact: formData.contact },
+        responsePayload: bvnResult as unknown as Record<string, unknown>,
+      }
+    }
+    if (activeService === 'account' && accountResult) {
+      return {
+        serviceType: 'account' as const,
+        requestPayload: { account_number: formData.account_number, bank_code: formData.bank_code },
+        responsePayload: accountResult as unknown as Record<string, unknown>,
+      }
+    }
+    if (activeService === 'credit' && creditResult) {
+      return {
+        serviceType: 'credit' as const,
+        requestPayload: { bvn: formData.bvn, bureau: formData.bureau },
+        responsePayload: creditResult as unknown as Record<string, unknown>,
+      }
+    }
+    return null
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -142,8 +244,10 @@ export default function Verify() {
           <div className="flex flex-col items-center gap-4">
             <Spinner size="lg" />
             <p className="text-sm text-[#64748B]">
-              {activeService === 'bvn' && formData.bvn
-                ? 'Verifying BVN…'
+              {activeService === 'bvn'
+                ? formData.bvn
+                  ? 'Verifying BVN…'
+                  : 'Sending OTP…'
                 : activeService === 'account'
                 ? 'Verifying account…'
                 : 'Fetching credit report…'}
@@ -177,6 +281,12 @@ export default function Verify() {
               onBackToServices={goToServices}
             />
           )}
+
+          {/* Save result prompt for unauthenticated users */}
+          {!isAuthenticated && (() => {
+            const props = getSavePromptProps()
+            return props ? <SaveResultPrompt {...props} /> : null
+          })()}
         </ServiceLayout>
       )}
 

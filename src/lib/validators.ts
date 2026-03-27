@@ -45,3 +45,74 @@ export type BVNFormValues = z.infer<typeof bvnSchema>
 export type OTPFormValues = z.infer<typeof otpSchema>
 export type AccountFormValues = z.infer<typeof accountSchema>
 export type CreditReportFormValues = z.infer<typeof creditReportSchema>
+
+// ─── Auth Schemas ────────────────────────────────────────────────────────────
+
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Enter a valid email address'),
+  password: z
+    .string()
+    .min(1, 'Password is required'),
+})
+
+export const signupSchema = z
+  .object({
+    full_name: z
+      .string()
+      .min(2, 'Name must be at least 2 characters'),
+    email: z
+      .string()
+      .min(1, 'Email is required')
+      .email('Enter a valid email address'),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+      .regex(/[0-9]/, 'Password must contain at least one number'),
+    confirm_password: z.string(),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: 'Passwords do not match',
+    path: ['confirm_password'],
+  })
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Enter a valid email address'),
+})
+
+export const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+      .regex(/[0-9]/, 'Password must contain at least one number'),
+    confirm_password: z.string(),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: 'Passwords do not match',
+    path: ['confirm_password'],
+  })
+
+export const profileSchema = z.object({
+  full_name: z.string().min(2, 'Name must be at least 2 characters'),
+  phone: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || /^(0|\+234)[789]\d{9}$/.test(v),
+      'Enter a valid Nigerian phone number'
+    ),
+})
+
+export type LoginFormValues = z.infer<typeof loginSchema>
+export type SignupFormValues = z.infer<typeof signupSchema>
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>
+export type ProfileFormValues = z.infer<typeof profileSchema>

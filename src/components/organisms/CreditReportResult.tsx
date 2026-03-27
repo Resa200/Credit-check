@@ -7,8 +7,10 @@ import LoanHistoryTable from '@/components/molecules/LoanHistoryTable'
 import CreditScoreGauge from '@/components/molecules/CreditScoreGauge'
 import StatusBadge from '@/components/molecules/StatusBadge'
 import Button from '@/components/atoms/Button'
-import { Download, ChevronDown, CheckCircle2, XCircle } from 'lucide-react'
+import { Download, ChevronDown, CheckCircle2, XCircle, FileJson, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useExport } from '@/hooks/useExport'
+import { useAuth } from '@/hooks/useAuth'
 
 interface CreditReportResultProps {
   data: CreditReportData
@@ -57,6 +59,8 @@ export default function CreditReportResult({
 }: CreditReportResultProps) {
   const reportRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
+  const { exportResultJSON, emailResult } = useExport()
+  const { isAuthenticated } = useAuth()
 
   const report = normalizeCreditReport(data, bureau)
 
@@ -211,15 +215,37 @@ export default function CreditReportResult({
       </div>
 
       {/* Actions */}
-      <Button
-        size="lg"
-        className="w-full"
-        onClick={handleDownload}
-        loading={downloading}
-      >
-        <Download size={16} />
-        Download PDF Report
-      </Button>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Button
+          size="lg"
+          className="flex-1"
+          onClick={handleDownload}
+          loading={downloading}
+        >
+          <Download size={16} />
+          Download PDF
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          className="flex-1"
+          onClick={() => exportResultJSON('credit', data as unknown as Record<string, unknown>)}
+        >
+          <FileJson size={16} />
+          Download JSON
+        </Button>
+        {isAuthenticated && (
+          <Button
+            size="lg"
+            variant="outline"
+            className="flex-1"
+            onClick={() => emailResult('credit', data as unknown as Record<string, unknown>)}
+          >
+            <Mail size={16} />
+            Email to Me
+          </Button>
+        )}
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <Button variant="outline" className="flex-1" onClick={onCheckAnother}>
