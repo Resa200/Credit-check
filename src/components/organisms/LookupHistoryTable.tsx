@@ -307,8 +307,6 @@ function ResultView({
 
   if (!data) return null
 
-  const noop = () => {} // No-op for actions not applicable in history view
-
   switch (row.service_type) {
     case 'bvn':
       return (

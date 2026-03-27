@@ -26,7 +26,6 @@ export default function SubscriptionPanel() {
     freeLimit,
     cancelSubscription,
     refreshSubscription,
-    initializePaystack,
   } = useSubscription()
   const { cards, loading: cardsLoading, fetchCards, removeCard, setDefaultCard } = usePaystackCards()
   const profile = useAuthStore((s) => s.profile)

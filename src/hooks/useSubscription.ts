@@ -9,7 +9,6 @@ import {
   getFirstOfMonth,
   loadPaystackScript,
 } from '@/lib/paystack'
-import { createAuditLog } from '@/lib/audit'
 import type { SubscriptionRow } from '@/types/supabase.types'
 
 /** Poll for webhook-created subscription (retries until found or timeout) */
