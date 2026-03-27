@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import AuthGuard from '@/components/molecules/AuthGuard'
-import { useAuthInit } from '@/hooks/useAuth'
+import { useAuthInit, useAuth } from '@/hooks/useAuth'
 import Landing from '@/pages/Landing'
 import Services from '@/pages/Services'
 import Verify from '@/pages/Verify'
@@ -13,6 +13,12 @@ import Profile from '@/pages/Profile'
 import AuthCallback from '@/pages/AuthCallback'
 import ShareView from '@/pages/ShareView'
 import CommandBar from '@/components/organisms/CommandBar'
+
+function AuthenticatedCommandBar() {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) return null
+  return <CommandBar />
+}
 
 export default function App() {
   useAuthInit()
@@ -29,7 +35,7 @@ export default function App() {
           },
         }}
       />
-      <CommandBar />
+      <AuthenticatedCommandBar />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/services" element={<Services />} />
