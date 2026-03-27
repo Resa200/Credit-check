@@ -9,7 +9,67 @@ import {
   getFirstOfMonth,
   loadPaystackScript,
 } from '@/lib/paystack'
+import { createAuditLog } from '@/lib/audit'
 import type { SubscriptionRow } from '@/types/supabase.types'
+
+/** Directly activate subscription + record transaction in DB (for demo/test mode without webhook) */
+async function activateSubscriptionDirectly(
+  userId: string,
+  reference: string,
+  paystackResponse: Record<string, unknown>
+): Promise<SubscriptionRow | null> {
+  const now = new Date()
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).toISOString()
+
+  // Upsert subscription
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .upsert(
+      {
+        user_id: userId,
+        paystack_customer_code: null,
+        paystack_subscription_code: null,
+        paystack_plan_code: PAYSTACK_PLAN_CODE,
+        status: 'active',
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd,
+        cancelled_at: null,
+        meta: { activated_client_side: true, paystack_response: paystackResponse },
+        created_by: userId,
+        modified_by: userId,
+      },
+      { onConflict: 'user_id' }
+    )
+    .select()
+    .maybeSingle()
+
+  // Record transaction
+  await supabase.from('payment_transactions').upsert(
+    {
+      user_id: userId,
+      paystack_reference: reference,
+      amount: 0, // Actual amount comes from webhook; 0 as placeholder
+      currency: 'NGN',
+      status: 'success',
+      payment_type: 'subscription',
+      meta: { activated_client_side: true },
+      created_by: userId,
+      modified_by: userId,
+    },
+    { onConflict: 'paystack_reference' }
+  )
+
+  // Audit log
+  await createAuditLog({
+    userId,
+    action: 'subscription_activate',
+    resourceType: 'subscriptions',
+    resourceId: sub?.id,
+    details: { reference, client_side: true },
+  })
+
+  return sub as SubscriptionRow | null
+}
 
 export async function fetchSubscription(userId: string): Promise<SubscriptionRow | null> {
   const { data } = await supabase
@@ -91,22 +151,28 @@ export function useSubscription() {
               { display_name: 'Full Name', variable_name: 'full_name', value: profile.full_name },
             ],
           },
-          callback: async () => {
+          callback: async (response: Record<string, unknown>) => {
             toast.success('Payment successful! Activating subscription...')
-            // Poll for webhook to process (up to 3 retries)
-            for (let i = 0; i < 3; i++) {
-              await new Promise((r) => setTimeout(r, 1500))
-              const sub = await fetchSubscription(profile.id)
-              if (sub && isSubscriptionActive(sub)) {
-                setSubscription(sub)
-                const count = await fetchMonthlyLookupCount(profile.id)
-                setMonthlyLookupCount(count)
-                onSuccess?.()
-                return
-              }
+            const reference = (response.reference ?? response.trxref ?? '') as string
+
+            // Try webhook-created subscription first
+            const existingSub = await fetchSubscription(profile.id)
+            if (existingSub && isSubscriptionActive(existingSub)) {
+              setSubscription(existingSub)
+              const count = await fetchMonthlyLookupCount(profile.id)
+              setMonthlyLookupCount(count)
+              onSuccess?.()
+              return
             }
-            // If webhook hasn't processed yet, still refresh
-            await refreshSubscription()
+
+            // No webhook processed yet — activate directly (demo/test mode)
+            const sub = await activateSubscriptionDirectly(profile.id, reference, response)
+            if (sub) {
+              setSubscription(sub)
+              const count = await fetchMonthlyLookupCount(profile.id)
+              setMonthlyLookupCount(count)
+            }
+            toast.success('Subscription activated!')
             onSuccess?.()
           },
           onClose: () => {

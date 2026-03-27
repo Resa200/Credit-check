@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'CreditCheck <noreply@creditcheck.app>',
+        from: 'CreditCheck <onboarding@resend.dev>',
         to: [user.email],
         subject: `CreditCheck - ${serviceLabel} Export`,
         html: emailHtml,
