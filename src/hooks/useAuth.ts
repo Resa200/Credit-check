@@ -210,16 +210,16 @@ export function useAuth() {
       resourceId: profile.id,
     })
 
-    await supabase
-      .from('users')
-      .update({
-        deleted_flag: true,
-        deleted_on: new Date().toISOString(),
-        deleted_by: profile.id,
-      })
-      .eq('id', profile.id)
+    const { data: { session } } = await supabase.auth.getSession()
+    const { data, error } = await supabase.functions.invoke('delete-account', {
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+    })
 
-    await supabase.auth.signOut()
+    if (error) throw new Error(error.message)
+    if (data?.error) throw new Error(data.error)
+
     clear()
   }, [profile, clear])
 
