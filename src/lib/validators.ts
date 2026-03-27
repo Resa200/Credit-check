@@ -36,7 +36,7 @@ export const creditReportSchema = z.object({
     .string()
     .length(11, 'BVN must be exactly 11 digits')
     .regex(/^\d+$/, 'BVN must contain only numbers'),
-  bureau: z.enum(['crc', 'firstcentral'], {
+  bureau: z.enum(['crc', 'firstcentral', 'combined'], {
     error: 'Please select a bureau',
   }),
 })

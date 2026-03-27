@@ -24,6 +24,7 @@ import CreditReportForm from '@/components/organisms/CreditReportForm'
 import BVNResult from '@/components/organisms/BVNResult'
 import AccountResult from '@/components/organisms/AccountResult'
 import CreditReportResult from '@/components/organisms/CreditReportResult'
+import CombinedCreditResult from '@/components/organisms/CombinedCreditResult'
 
 import type { BVNFormValues, AccountFormValues, CreditReportFormValues } from '@/lib/validators'
 import type { OTPFormValues } from '@/lib/validators'
@@ -42,7 +43,7 @@ const serviceInfo = {
   },
   credit: {
     title: 'Credit Report',
-    subtitle: 'Pull your full credit report from CRC or FirstCentral.',
+    subtitle: 'Pull your credit report from CRC, FirstCentral, or both.',
   },
 }
 
@@ -94,6 +95,7 @@ export default function Verify() {
     bvnResult,
     accountResult,
     creditResult,
+    combinedCreditResult,
     error,
     guestLookupUsed,
     setStep,
@@ -101,6 +103,7 @@ export default function Verify() {
     setBVNResult,
     setAccountResult,
     setCreditResult,
+    setCombinedCreditResult,
     setError,
     markGuestLookupUsed,
     reset,
@@ -211,6 +214,31 @@ export default function Verify() {
     }
     setStep('loading')
     setFormData({ bureau: data.bureau })
+
+    // ── Combined report: fetch from both bureaus ──
+    if (data.bureau === 'combined') {
+      try {
+        const result = await adjutorApi.getCombinedCreditReport(data.bvn)
+        setCombinedCreditResult(result)
+        if (!isAuthenticated) markGuestLookupUsed()
+        if (isAuthenticated && profile) {
+          await persistLookup(
+            profile.id, 'credit',
+            { bvn: data.bvn, bureau: 'combined' },
+            result as unknown as Record<string, unknown>,
+            'success'
+          )
+          setMonthlyLookupCount((monthlyLookupCount ?? 0) + 1)
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to retrieve combined credit report'
+        setError(message)
+        toast.error(message)
+      }
+      return
+    }
+
+    // ── Single bureau ──
     try {
       const res = await adjutorApi.getCreditReport(data.bureau, data.bvn)
       setCreditResult(res.data)
@@ -245,6 +273,13 @@ export default function Verify() {
         serviceType: 'account' as const,
         requestPayload: { account_number: formData.account_number, bank_code: formData.bank_code },
         responsePayload: accountResult as unknown as Record<string, unknown>,
+      }
+    }
+    if (activeService === 'credit' && combinedCreditResult) {
+      return {
+        serviceType: 'credit' as const,
+        requestPayload: { bvn: formData.bvn, bureau: 'combined' },
+        responsePayload: combinedCreditResult as unknown as Record<string, unknown>,
       }
     }
     if (activeService === 'credit' && creditResult) {
@@ -289,6 +324,8 @@ export default function Verify() {
                   : 'Sending OTP…'
                 : activeService === 'account'
                 ? 'Verifying account…'
+                : formData.bureau === 'combined'
+                ? 'Fetching reports from both bureaus…'
                 : 'Fetching credit report…'}
             </p>
           </div>
@@ -312,7 +349,14 @@ export default function Verify() {
               onBackToServices={goToServices}
             />
           )}
-          {activeService === 'credit' && creditResult && (
+          {activeService === 'credit' && formData.bureau === 'combined' && combinedCreditResult && (
+            <CombinedCreditResult
+              data={combinedCreditResult}
+              onCheckAnother={reset}
+              onBackToServices={goToServices}
+            />
+          )}
+          {activeService === 'credit' && formData.bureau !== 'combined' && creditResult && (
             <CreditReportResult
               data={creditResult}
               bureau={formData.bureau || 'crc'}

@@ -112,7 +112,6 @@ export function useExport() {
     async (
       serviceType: string,
       resultData: Record<string, unknown>,
-      format: 'json' | 'csv' = 'json'
     ) => {
       if (!profile) {
         toast.error('Please sign in to email results')
@@ -125,7 +124,6 @@ export function useExport() {
             user_id: profile.id,
             service_type: serviceType,
             result_data: resultData,
-            format,
           },
         })
 

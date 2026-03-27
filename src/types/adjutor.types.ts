@@ -234,6 +234,32 @@ export interface NormalizedCreditReport {
   lastCheckedDate?: string
 }
 
+// ─── Combined Credit Report ──────────────────────────────────────────────
+
+export interface CreditScoreFactor {
+  label: string
+  score: number
+  max: number
+  weight: number
+}
+
+export interface CreditCheckScore {
+  score: number
+  max: number
+  rating: string
+  factors: CreditScoreFactor[]
+}
+
+export interface CombinedCreditReport {
+  crc: NormalizedCreditReport | null
+  firstCentral: NormalizedCreditReport | null
+  crcRaw: CreditReportData | null
+  firstCentralRaw: CreditReportData | null
+  creditCheckScore: CreditCheckScore
+  errors: { bureau: string; message: string }[]
+  fetchedAt: string
+}
+
 // ─── Bank List ────────────────────────────────────────────────────────────────
 
 export interface Bank {
@@ -256,4 +282,4 @@ export type AppStep =
   | 'result'
   | 'error'
 
-export type BureauType = 'crc' | 'firstcentral'
+export type BureauType = 'crc' | 'firstcentral' | 'combined'

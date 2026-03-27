@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf'
-import type { NormalizedCreditReport } from '@/types/adjutor.types'
+import type { NormalizedCreditReport, CombinedCreditReport } from '@/types/adjutor.types'
 import { formatNaira, formatDate, getCreditRating } from './utils'
 import type { RefObject } from 'react'
 
@@ -266,4 +266,280 @@ export async function generateCreditPDF(
   })
 
   doc.save(`CreditCheck_Report_${bureau.toUpperCase()}_${Date.now()}.pdf`)
+}
+
+// ─── Combined Credit Report PDF ──────────────────────────────────────────────
+
+export async function generateCombinedCreditPDF(
+  data: CombinedCreditReport,
+  _ref: RefObject<HTMLDivElement | null>
+): Promise<void> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+  const W = 210
+  const margin = 20
+  const contentW = W - margin * 2
+  let y = 0
+
+  const { crc, firstCentral, creditCheckScore } = data
+  const name = crc?.fullName || firstCentral?.fullName || 'Report Holder'
+  const generatedDate = new Date().toLocaleDateString('en-NG', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  })
+
+  // ── Cover Page ──────────────────────────────────────────────────────────────
+  doc.setFillColor(PRIMARY)
+  doc.rect(0, 0, W, 45, 'F')
+
+  doc.setFillColor('#FFFFFF')
+  doc.roundedRect(margin, 10, 10, 10, 2, 2, 'F')
+  doc.setFontSize(7)
+  doc.setTextColor(PRIMARY)
+  doc.text('CC', margin + 2.2, 17.5)
+
+  doc.setFontSize(18)
+  doc.setTextColor('#FFFFFF')
+  doc.setFont('helvetica', 'bold')
+  doc.text('CreditCheck', margin + 14, 17)
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor('#EDE9FE')
+  doc.text('Combined Credit Report', margin + 14, 23)
+
+  doc.setFontSize(8)
+  doc.setTextColor('#C4B5FD')
+  doc.text(`CRC + FirstCentral  ·  Generated ${generatedDate}`, margin, 38)
+
+  y = 60
+
+  // Name
+  doc.setFontSize(22)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(TEXT)
+  doc.text(name, margin, y)
+  y += 8
+
+  doc.setDrawColor(BORDER)
+  doc.line(margin, y, W - margin, y)
+  y += 12
+
+  // ── CreditCheck Score ─────────────────────────────────────────────────────
+  const rating = creditCheckScore.rating
+  const color = ratingColor(rating)
+
+  doc.setFillColor(color)
+  doc.roundedRect(margin, y, 60, 28, 3, 3, 'F')
+
+  doc.setFontSize(24)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor('#FFFFFF')
+  doc.text(String(creditCheckScore.score), margin + 6, y + 16)
+
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`/ ${creditCheckScore.max}`, margin + 6 + doc.getTextWidth(String(creditCheckScore.score)) + 1, y + 16)
+
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`CreditCheck Score · ${rating}`, margin + 6, y + 23)
+
+  // Bureau scores side by side
+  let sx = margin + 70
+  if (crc?.creditScore !== undefined) {
+    doc.setFillColor('#F5F3FF')
+    doc.roundedRect(sx, y, 50, 28, 3, 3, 'F')
+    doc.setFontSize(16)
+    doc.setTextColor(TEXT)
+    doc.text(String(crc.creditScore), sx + 6, y + 14)
+    doc.setFontSize(7)
+    doc.setTextColor(MUTED)
+    doc.text(`CRC / ${crc.maxScore || 850}`, sx + 6, y + 22)
+    sx += 55
+  }
+  if (firstCentral?.creditScore !== undefined) {
+    doc.setFillColor('#F0F9FF')
+    doc.roundedRect(sx, y, 50, 28, 3, 3, 'F')
+    doc.setFontSize(16)
+    doc.setTextColor(TEXT)
+    doc.text(String(firstCentral.creditScore), sx + 6, y + 14)
+    doc.setFontSize(7)
+    doc.setTextColor(MUTED)
+    doc.text(`FC / ${firstCentral.maxScore || 850}`, sx + 6, y + 22)
+  }
+  y += 38
+
+  // ── Helper functions ──────────────────────────────────────────────────────
+  function sectionHeader(title: string) {
+    if (y > 260) { doc.addPage(); y = 20 }
+    doc.setFillColor('#F8F7FF')
+    doc.rect(margin, y, contentW, 8, 'F')
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(PRIMARY)
+    doc.text(title.toUpperCase(), margin + 3, y + 5.5)
+    y += 12
+  }
+
+  function dataRow(label: string, value: string) {
+    if (y > 270) { doc.addPage(); y = 20 }
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(MUTED)
+    doc.text(label, margin, y)
+    doc.setTextColor(TEXT)
+    doc.setFont('helvetica', 'bold')
+    const maxW = contentW - 60
+    const lines = doc.splitTextToSize(value, maxW)
+    doc.text(lines, W - margin, y, { align: 'right' })
+    y += lines.length * 5 + 3
+    doc.setDrawColor(BORDER)
+    doc.line(margin, y - 1, W - margin, y - 1)
+  }
+
+  // ── Score Factor Breakdown ────────────────────────────────────────────────
+  sectionHeader('Score Breakdown')
+  creditCheckScore.factors.forEach((factor) => {
+    const pct = Math.round((factor.score / factor.max) * 100)
+    dataRow(factor.label, `${pct}% (weight: ${Math.round(factor.weight * 100)}%)`)
+  })
+  y += 4
+
+  // ── Personal Info ─────────────────────────────────────────────────────────
+  const pi = crc || firstCentral
+  if (pi) {
+    sectionHeader('Personal Information')
+    if (pi.fullName) dataRow('Full Name', pi.fullName)
+    if (pi.dateOfBirth) dataRow('Date of Birth', formatDate(pi.dateOfBirth))
+    if (pi.gender) dataRow('Gender', pi.gender)
+    if (pi.phone) dataRow('Phone', pi.phone)
+    if (pi.address) dataRow('Address', pi.address)
+    y += 4
+  }
+
+  // ── Credit Stats ──────────────────────────────────────────────────────────
+  const allStats = [
+    ...(crc?.creditStats || []).map((s) => ({ ...s, bureau: 'CRC' })),
+    ...(firstCentral?.creditStats || []).map((s) => ({ ...s, bureau: 'FC' })),
+  ]
+  if (allStats.length > 0) {
+    sectionHeader('Credit Summary')
+    allStats.forEach((stat) => dataRow(`${stat.label} (${stat.bureau})`, stat.value))
+    y += 4
+  }
+
+  // ── Facility Sections (CRC) ───────────────────────────────────────────────
+  if (crc?.facilitySections && crc.facilitySections.length > 0) {
+    sectionHeader('Credit Facilities (CRC)')
+    crc.facilitySections.forEach((section) => {
+      dataRow(section.label, section.hasFacilities ? 'Has Facilities' : 'No Facilities')
+      if (section.hasFacilities) {
+        dataRow('Delinquent Facilities', String(section.delinquentCount))
+      }
+      if (section.lastReportedDate) {
+        dataRow('Last Reported', section.lastReportedDate)
+      }
+    })
+    y += 4
+  }
+
+  // ── Combined Loan History ─────────────────────────────────────────────────
+  const loans = [
+    ...(crc?.loans || []).map((l) => ({ ...l, _bureau: 'CRC' })),
+    ...(firstCentral?.loans || []).map((l) => ({ ...l, _bureau: 'FC' })),
+  ]
+  if (loans.length > 0) {
+    sectionHeader('Combined Loan History')
+
+    const cols = { bureau: margin, lender: margin + 18, amount: margin + 60, outstanding: margin + 95, status: margin + 130, date: margin + 155 }
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(MUTED)
+    doc.text('Bureau', cols.bureau, y)
+    doc.text('Lender', cols.lender, y)
+    doc.text('Amount', cols.amount, y)
+    doc.text('Outstanding', cols.outstanding, y)
+    doc.text('Status', cols.status, y)
+    doc.text('Date', cols.date, y)
+    y += 4
+    doc.setDrawColor(BORDER)
+    doc.line(margin, y, W - margin, y)
+    y += 4
+
+    loans.forEach((loan) => {
+      if (y > 270) { doc.addPage(); y = 20 }
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(TEXT)
+      doc.setFontSize(8)
+      doc.text(loan._bureau, cols.bureau, y)
+      doc.text(loan.lender || '—', cols.lender, y)
+      doc.text(formatNaira(loan.loan_amount), cols.amount, y)
+      doc.text(formatNaira(loan.outstanding_balance), cols.outstanding, y)
+      doc.text(loan.status || '—', cols.status, y)
+      doc.text(formatDate(loan.date_reported || ''), cols.date, y)
+      y += 6
+      doc.setDrawColor('#F1F5F9')
+      doc.line(margin, y - 1, W - margin, y - 1)
+    })
+    y += 4
+  }
+
+  // ── Combined Enquiry History ──────────────────────────────────────────────
+  const enquiries = [
+    ...(crc?.enquiries || []).map((e) => ({ ...e, _bureau: 'CRC' })),
+    ...(firstCentral?.enquiries || []).map((e) => ({ ...e, _bureau: 'FC' })),
+  ]
+  if (enquiries.length > 0) {
+    sectionHeader('Combined Enquiry History')
+    enquiries.forEach((eq) => {
+      dataRow(
+        `[${eq._bureau}] ${formatDate(eq.enquiry_date || '')}`,
+        `${eq.institution || '—'}${eq.purpose ? ` · ${eq.purpose}` : ''}`
+      )
+    })
+    y += 4
+  }
+
+  // ── Footer on every page ──────────────────────────────────────────────────
+  const totalPages = doc.getNumberOfPages()
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    doc.setFillColor('#F8F7FF')
+    doc.rect(0, 287, W, 10, 'F')
+    doc.setFontSize(7)
+    doc.setTextColor(MUTED)
+    doc.text('Generated via CreditCheck · Combined Report · CRC + FirstCentral', margin, 293)
+    doc.text(`Page ${i} of ${totalPages}`, W - margin, 293, { align: 'right' })
+  }
+
+  // ── Disclaimer ──────────────────────────────────────────────────────────────
+  doc.addPage()
+  y = 30
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(TEXT)
+  doc.text('Disclaimer', margin, y)
+  y += 8
+
+  doc.setFontSize(8.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(MUTED)
+  const disclaimer = [
+    'This combined credit report has been generated for informational purposes only, based',
+    'on data retrieved from both CRC Credit Bureau and FirstCentral via the Adjutor API.',
+    '',
+    'The CreditCheck Score is a proprietary score computed from available bureau data.',
+    'It is not an official credit score from any bureau and should be used as a guide only.',
+    '',
+    'CreditCheck does not store, share, or retain any of your personal or financial data.',
+    'All information was retrieved directly from the bureaus at the time of your request.',
+    '',
+    `Report generated on ${generatedDate} via CreditCheck · Powered by Adjutor.`,
+  ]
+
+  disclaimer.forEach((line) => {
+    doc.text(line, margin, y)
+    y += 5.5
+  })
+
+  doc.save(`CreditCheck_Combined_Report_${Date.now()}.pdf`)
 }

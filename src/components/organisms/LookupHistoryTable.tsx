@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, Search, X } from 'lucide-react'
 import { useLookupHistory } from '@/hooks/useLookupHistory'
 import type { HistoryFilters } from '@/hooks/useLookupHistory'
+import type { DataLookupRequestRow } from '@/types/supabase.types'
+import type { BVNData, AccountData, CreditReportData } from '@/types/adjutor.types'
 import { cn } from '@/lib/utils'
 import Button from '@/components/atoms/Button'
 import Spinner from '@/components/atoms/Spinner'
 import ExportMenu from '@/components/molecules/ExportMenu'
+import BVNResult from '@/components/organisms/BVNResult'
+import AccountResult from '@/components/organisms/AccountResult'
+import CreditReportResult from '@/components/organisms/CreditReportResult'
 
 const serviceLabels: Record<string, string> = {
   bvn: 'BVN Lookup',
@@ -28,6 +33,7 @@ export default function LookupHistoryTable({ initialFilters }: LookupHistoryTabl
     rows, loading, page, totalPages, setPage, filters, setFilters,
   } = useLookupHistory()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [viewingResult, setViewingResult] = useState<DataLookupRequestRow | null>(null)
 
   // Apply initial filters from URL params (set by command bar)
   useEffect(() => {
@@ -35,9 +41,30 @@ export default function LookupHistoryTable({ initialFilters }: LookupHistoryTabl
       setFilters(initialFilters)
       setPage(0)
     }
-  // Only apply on mount or when initialFilters reference changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFilters])
+
+  // Full result view modal
+  if (viewingResult && viewingResult.response_payload && viewingResult.status === 'success') {
+    return (
+      <div className="flex flex-col gap-4">
+        {/* Back button */}
+        <button
+          type="button"
+          onClick={() => setViewingResult(null)}
+          className="flex items-center gap-2 text-sm font-medium text-[#7C3AED] hover:text-[#6D28D9] transition-colors self-start"
+        >
+          <X size={16} />
+          Back to History
+        </button>
+
+        {/* Result card */}
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5">
+          <ResultView row={viewingResult} onClose={() => setViewingResult(null)} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -123,6 +150,7 @@ export default function LookupHistoryTable({ initialFilters }: LookupHistoryTabl
                 <th className="px-4 py-3 font-medium text-[#94A3B8]">Date</th>
                 <th className="px-4 py-3 font-medium text-[#94A3B8]">Service</th>
                 <th className="px-4 py-3 font-medium text-[#94A3B8]">Status</th>
+                <th className="px-4 py-3 font-medium text-[#94A3B8]"></th>
               </tr>
             </thead>
             <tbody>
@@ -134,6 +162,7 @@ export default function LookupHistoryTable({ initialFilters }: LookupHistoryTabl
                   onToggle={() =>
                     setExpandedId(expandedId === row.id ? null : row.id)
                   }
+                  onViewResult={() => setViewingResult(row)}
                 />
               ))}
             </tbody>
@@ -173,10 +202,12 @@ function TableRow({
   row,
   expanded,
   onToggle,
+  onViewResult,
 }: {
-  row: import('@/types/supabase.types').DataLookupRequestRow
+  row: DataLookupRequestRow
   expanded: boolean
   onToggle: () => void
+  onViewResult: () => void
 }) {
   const date = new Date(row.created_on).toLocaleDateString('en-NG', {
     day: 'numeric',
@@ -185,6 +216,8 @@ function TableRow({
     hour: '2-digit',
     minute: '2-digit',
   })
+
+  const canView = row.status === 'success' && row.response_payload
 
   return (
     <>
@@ -213,10 +246,24 @@ function TableRow({
             {row.status}
           </span>
         </td>
+        <td className="px-4 py-3">
+          {canView && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewResult()
+              }}
+              className="text-xs font-medium text-[#7C3AED] hover:text-[#6D28D9] transition-colors"
+            >
+              View
+            </button>
+          )}
+        </td>
       </tr>
       {expanded && (
         <tr className="bg-[#FAFAFA]">
-          <td colSpan={4} className="px-4 py-4">
+          <td colSpan={5} className="px-4 py-4">
             <div className="flex flex-col gap-3">
               <div>
                 <h4 className="text-xs font-semibold text-[#94A3B8] uppercase mb-1">
@@ -227,13 +274,17 @@ function TableRow({
                 </pre>
               </div>
               {row.response_payload && (
-                <div>
-                  <h4 className="text-xs font-semibold text-[#94A3B8] uppercase mb-1">
-                    Response
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold text-[#94A3B8] uppercase">
+                    Response available
                   </h4>
-                  <pre className="text-xs text-[#1E293B] bg-white rounded-lg border border-[#E2E8F0] p-3 overflow-x-auto max-h-60">
-                    {JSON.stringify(row.response_payload, null, 2)}
-                  </pre>
+                  <button
+                    type="button"
+                    onClick={onViewResult}
+                    className="text-xs font-medium text-[#7C3AED] hover:text-[#6D28D9] bg-[#EDE9FE] px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    View Full Result
+                  </button>
                 </div>
               )}
             </div>
@@ -242,4 +293,55 @@ function TableRow({
       )}
     </>
   )
+}
+
+/** Renders the response using the same result components as the live lookup flow */
+function ResultView({
+  row,
+  onClose,
+}: {
+  row: DataLookupRequestRow
+  onClose: () => void
+}) {
+  const data = row.response_payload
+
+  if (!data) return null
+
+  const noop = () => {} // No-op for actions not applicable in history view
+
+  switch (row.service_type) {
+    case 'bvn':
+      return (
+        <BVNResult
+          data={data as unknown as BVNData}
+          onCheckAnother={onClose}
+          onBackToServices={onClose}
+        />
+      )
+    case 'account':
+      return (
+        <AccountResult
+          data={data as unknown as AccountData}
+          onCheckAnother={onClose}
+          onBackToServices={onClose}
+        />
+      )
+    case 'credit': {
+      const bureau = (row.request_payload as Record<string, string>)?.bureau ?? 'crc'
+      return (
+        <CreditReportResult
+          data={data as unknown as CreditReportData}
+          bureau={bureau}
+          onCheckAnother={onClose}
+          onBackToServices={onClose}
+        />
+      )
+    }
+    default:
+      return (
+        <pre className="text-xs text-[#1E293B] bg-white rounded-lg border border-[#E2E8F0] p-3 overflow-x-auto">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      )
+  }
 }

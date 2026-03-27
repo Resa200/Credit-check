@@ -5,6 +5,7 @@ import type {
   BVNData,
   AccountData,
   CreditReportData,
+  CombinedCreditReport,
 } from '@/types/adjutor.types'
 
 interface AppState {
@@ -21,6 +22,7 @@ interface AppState {
   bvnResult: BVNData | null
   accountResult: AccountData | null
   creditResult: CreditReportData | null
+  combinedCreditResult: CombinedCreditReport | null
 
   // error message
   error: string | null
@@ -35,6 +37,7 @@ interface AppState {
   setBVNResult: (data: BVNData) => void
   setAccountResult: (data: AccountData) => void
   setCreditResult: (data: CreditReportData) => void
+  setCombinedCreditResult: (data: CombinedCreditReport) => void
   setError: (msg: string) => void
   markGuestLookupUsed: () => void
   reset: () => void
@@ -48,6 +51,7 @@ const initialState = {
   bvnResult: null,
   accountResult: null,
   creditResult: null,
+  combinedCreditResult: null,
   error: null,
   guestLookupUsed: false,
 }
@@ -69,6 +73,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   setCreditResult: (data) => set({ creditResult: data, step: 'result' }),
 
+  setCombinedCreditResult: (data) => set({ combinedCreditResult: data, step: 'result' }),
+
   setError: (msg) => set({ error: msg, step: 'error' }),
 
   markGuestLookupUsed: () => set({ guestLookupUsed: true }),
@@ -87,6 +93,7 @@ export const useAppStore = create<AppState>((set) => ({
       bvnResult: null,
       accountResult: null,
       creditResult: null,
+      combinedCreditResult: null,
       guestLookupUsed: state.guestLookupUsed,
     })),
 }))
